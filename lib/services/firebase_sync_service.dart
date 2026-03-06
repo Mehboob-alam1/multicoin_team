@@ -1,0 +1,172 @@
+import 'package:firebase_database/firebase_database.dart';
+import '../models/player_data.dart';
+
+class FirebaseSyncService {
+  final _db = FirebaseDatabase.instance;
+  static const _users = 'users';
+  static const _leaderboard = 'leaderboard';
+  static const _playerData = 'playerData';
+  static const _purchases = 'purchases';
+  static const _oneTime = 'oneTime';
+  static const _subscription = 'subscription';
+  static const _boostExpiryMs = 'boostExpiryMs';
+
+  /// Sync full player data to Firebase (merge with cloud).
+  Future<void> syncPlayerData(String uid, PlayerData data, {String? displayName}) async {
+    try {
+      final ref = _db.ref('$_users/$uid/$_playerData');
+      await ref.set(data.toJson());
+      if (displayName != null && displayName.isNotEmpty) {
+        await _db.ref('$_users/$uid/profile/displayName').set(displayName);
+      }
+    } catch (_) {
+      rethrow;
+    }
+  }
+
+  /// Fetch player data from Firebase. Returns null if none or error.
+  Future<PlayerData?> fetchPlayerData(String uid) async {
+    try {
+      final snap = await _db.ref('$_users/$uid/$_playerData').get();
+      if (!snap.exists || snap.value == null) return null;
+      final map = Map<String, dynamic>.from(snap.value as Map);
+      return PlayerData.fromJson(map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Update leaderboard entry for this user (call after balance/mining power change).
+  Future<void> updateLeaderboard(
+    String uid, {
+    required String displayName,
+    required double btcBalance,
+    required double totalBtcPerMin,
+  }) async {
+    try {
+      await _db.ref('$_leaderboard/entries/$uid').set({
+        'displayName': displayName,
+        'btcBalance': btcBalance,
+        'totalBtcPerMin': totalBtcPerMin,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      });
+    } catch (_) {
+      rethrow;
+    }
+  }
+
+  /// Get top entries by balance (descending). Returns list of [rank, displayName, btcBalance, totalBtcPerMin].
+  Future<List<LeaderboardEntry>> getLeaderboard({int limit = 100}) async {
+    try {
+      final snap = await _db.ref('$_leaderboard/entries').orderByChild('btcBalance').limitToLast(500).get();
+      if (!snap.exists || snap.value == null) return [];
+      final map = snap.value as Map<dynamic, dynamic>;
+      final list = map.entries
+          .map((e) => LeaderboardEntry(
+                uid: e.key as String,
+                displayName: (e.value as Map)['displayName'] as String? ?? 'Unknown',
+                btcBalance: ((e.value as Map)['btcBalance'] as num?)?.toDouble() ?? 0,
+                totalBtcPerMin: ((e.value as Map)['totalBtcPerMin'] as num?)?.toDouble() ?? 0,
+              ))
+          .toList();
+      list.sort((a, b) => b.btcBalance.compareTo(a.btcBalance));
+      return list.take(limit).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Record one-time purchase (store in Firebase).
+  Future<void> recordOneTimePurchase(String uid, String productId) async {
+    try {
+      await _db.ref('$_users/$uid/$_purchases/$_oneTime/$productId').set(DateTime.now().millisecondsSinceEpoch);
+    } catch (_) {
+      rethrow;
+    }
+  }
+
+  /// Record subscription (planId + expiry timestamp ms).
+  Future<void> recordSubscription(String uid, String planId, DateTime expiry) async {
+    try {
+      await _db.ref('$_users/$uid/$_purchases/$_subscription').set({
+        'planId': planId,
+        'expiryMs': expiry.millisecondsSinceEpoch,
+      });
+    } catch (_) {
+      rethrow;
+    }
+  }
+
+  /// Check if user has purchased one-time product.
+  Future<bool> hasOneTimePurchase(String uid, String productId) async {
+    try {
+      final snap = await _db.ref('$_users/$uid/$_purchases/$_oneTime/$productId').get();
+      return snap.exists;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Get all one-time purchase IDs.
+  Future<List<String>> getOneTimePurchases(String uid) async {
+    try {
+      final snap = await _db.ref('$_users/$uid/$_purchases/$_oneTime').get();
+      if (!snap.exists || snap.value == null) return [];
+      final map = snap.value as Map<dynamic, dynamic>;
+      return map.keys.map((e) => e as String).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Record 2x boost expiry (e.g. 1 hour from now).
+  Future<void> recordBoostExpiry(String uid, DateTime expiry) async {
+    try {
+      await _db.ref('$_users/$uid/$_purchases/$_boostExpiryMs').set(expiry.millisecondsSinceEpoch);
+    } catch (_) {
+      rethrow;
+    }
+  }
+
+  /// Get boost expiry (null if none or expired).
+  Future<DateTime?> getBoostExpiry(String uid) async {
+    try {
+      final snap = await _db.ref('$_users/$uid/$_purchases/$_boostExpiryMs').get();
+      if (!snap.exists || snap.value == null) return null;
+      final ms = (snap.value as num).toInt();
+      final expiry = DateTime.fromMillisecondsSinceEpoch(ms);
+      return expiry.isAfter(DateTime.now()) ? expiry : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Get subscription expiry (null if none or expired).
+  Future<DateTime?> getSubscriptionExpiry(String uid) async {
+    try {
+      final snap = await _db.ref('$_users/$uid/$_purchases/$_subscription').get();
+      if (!snap.exists || snap.value == null) return null;
+      final map = snap.value as Map<dynamic, dynamic>;
+      final ms = (map['expiryMs'] as num?)?.toInt();
+      if (ms == null) return null;
+      final expiry = DateTime.fromMillisecondsSinceEpoch(ms);
+      return expiry.isAfter(DateTime.now()) ? expiry : null;
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+class LeaderboardEntry {
+  final String uid;
+  final String displayName;
+  final double btcBalance;
+  final double totalBtcPerMin;
+
+  LeaderboardEntry({
+    required this.uid,
+    required this.displayName,
+    required this.btcBalance,
+    required this.totalBtcPerMin,
+  });
+}
