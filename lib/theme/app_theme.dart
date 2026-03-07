@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   static const Color primary = Color(0xFFFF9500); // arancione mining
@@ -8,10 +9,19 @@ class AppTheme {
   static const Color cardBg = Color(0xFF252525);
   static const Color btcGold = Color(0xFFF2A900);
 
+  static const String fontFamily = 'Space Grotesk';
+
+  static TextTheme get darkTextTheme =>
+      GoogleFonts.spaceGroteskTextTheme(ThemeData.dark().textTheme);
+
   static ThemeData get dark {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      fontFamily: GoogleFonts.spaceGrotesk().fontFamily,
+      textTheme: GoogleFonts.spaceGroteskTextTheme(
+        ThemeData.dark().textTheme,
+      ),
       colorScheme: ColorScheme.dark(
         primary: primary,
         onPrimary: Colors.black,
@@ -20,10 +30,15 @@ class AppTheme {
         surfaceContainerHighest: surfaceVariant,
       ),
       scaffoldBackgroundColor: surface,
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: surface,
         foregroundColor: Colors.white,
         elevation: 0,
+        titleTextStyle: GoogleFonts.spaceGrotesk(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       cardTheme: CardThemeData(
         color: cardBg,

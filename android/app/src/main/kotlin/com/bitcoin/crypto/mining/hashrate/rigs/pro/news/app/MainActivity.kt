@@ -1,4 +1,4 @@
-package com.example.btc_sim
+package com.bitcoin.crypto.mining.hashrate.rigs.pro.news.app
 
 import io.flutter.embedding.android.FlutterActivity
 

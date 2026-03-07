@@ -1,0 +1,82 @@
+{
+  "parameters": {
+    "ads_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "valueType": "BOOLEAN"
+    },
+    "use_custom_tab": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "valueType": "BOOLEAN"
+    },
+    "custom_tab_url": {
+      "defaultValue": {
+        "value": "https://example.com"
+      },
+      "valueType": "STRING"
+    },
+    "interstitial_ad_unit": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/1033173712"
+      },
+      "valueType": "STRING"
+    },
+    "interstitial_admanager_unit": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/1033173712"
+      },
+      "valueType": "STRING"
+    },
+    "rewarded_ad_unit": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/5224354917"
+      },
+      "valueType": "STRING"
+    },
+    "rewarded_admanager_unit": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/5224354917"
+      },
+      "valueType": "STRING"
+    },
+    "native_ad_unit": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/2247696110"
+      },
+      "valueType": "STRING"
+    },
+    "native_admanager_unit": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/2247696110"
+      },
+      "valueType": "STRING"
+    },
+    "admob_app_open_android": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/9257395921"
+      },
+      "valueType": "STRING"
+    },
+    "admanager_app_open": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/9257395921"
+      },
+      "valueType": "STRING"
+    },
+    "banner_ad_unit": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/6300978111"
+      },
+      "valueType": "STRING"
+    },
+    "banner_admanager_unit": {
+      "defaultValue": {
+        "value": "/21775744923/example/adaptive-banner"
+      },
+      "valueType": "STRING"
+    }
+  }
+}

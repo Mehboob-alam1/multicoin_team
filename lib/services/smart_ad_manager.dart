@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'ad_remote_config_service.dart';
 
 enum AdSlot { appOpen, native, rewarded, interstitial, banner }
 enum AdProviderSource { admob, adx }
@@ -18,37 +19,27 @@ class _AdUnitCatalog {
     switch (slot) {
       case AdSlot.banner:
         return _SlotIds(
-          admob: isIOS
-              ? 'ca-app-pub-3940256099942544/2934735716'
-              : 'ca-app-pub-3940256099942544/6300978111',
+          admob: isIOS ? 'ca-app-pub-3940256099942544/2934735716' : 'ca-app-pub-3940256099942544/6300978111',
           adx: '/21775744923/example/adaptive-banner',
         );
       case AdSlot.interstitial:
         return _SlotIds(
-          admob: isIOS
-              ? 'ca-app-pub-3940256099942544/4411468910'
-              : 'ca-app-pub-3940256099942544/1033173712',
+          admob: isIOS ? 'ca-app-pub-3940256099942544/4411468910' : 'ca-app-pub-3940256099942544/1033173712',
           adx: '/21775744923/example/interstitial',
         );
       case AdSlot.rewarded:
         return _SlotIds(
-          admob: isIOS
-              ? 'ca-app-pub-3940256099942544/1712485313'
-              : 'ca-app-pub-3940256099942544/5224354917',
+          admob: isIOS ? 'ca-app-pub-3940256099942544/1712485313' : 'ca-app-pub-3940256099942544/5224354917',
           adx: '/21775744923/example/rewarded',
         );
       case AdSlot.native:
         return _SlotIds(
-          admob: isIOS
-              ? 'ca-app-pub-3940256099942544/3986624511'
-              : 'ca-app-pub-3940256099942544/2247696110',
+          admob: isIOS ? 'ca-app-pub-3940256099942544/3986624511' : 'ca-app-pub-3940256099942544/2247696110',
           adx: '/21775744923/example/native',
         );
       case AdSlot.appOpen:
         return _SlotIds(
-          admob: isIOS
-              ? 'ca-app-pub-3940256099942544/5575463023'
-              : 'ca-app-pub-3940256099942544/9257395921',
+          admob: isIOS ? 'ca-app-pub-3940256099942544/5575463023' : 'ca-app-pub-3940256099942544/9257395921',
           adx: '/21775744923/example/app-open',
         );
     }
@@ -63,12 +54,49 @@ class BannerHandle {
 }
 
 class SmartAdManager extends ChangeNotifier {
+  SmartAdManager(this._config);
+
+  final AdRemoteConfigService? _config;
+
   bool _loadingRewarded = false;
   String? _lastError;
+
+  _SlotIds _getIds(AdSlot slot) {
+    final fallback = _AdUnitCatalog.ids(slot);
+    if (_config == null) return fallback;
+    switch (slot) {
+      case AdSlot.interstitial:
+        return _SlotIds(
+          admob: _config!.interstitialAdmobId.isNotEmpty ? _config!.interstitialAdmobId : fallback.admob,
+          adx: _config!.interstitialAdxId.isNotEmpty ? _config!.interstitialAdxId : fallback.adx,
+        );
+      case AdSlot.rewarded:
+        return _SlotIds(
+          admob: _config!.rewardedAdmobId.isNotEmpty ? _config!.rewardedAdmobId : fallback.admob,
+          adx: _config!.rewardedAdxId.isNotEmpty ? _config!.rewardedAdxId : fallback.adx,
+        );
+      case AdSlot.native:
+        return _SlotIds(
+          admob: _config!.nativeAdmobId.isNotEmpty ? _config!.nativeAdmobId : fallback.admob,
+          adx: _config!.nativeAdxId.isNotEmpty ? _config!.nativeAdxId : fallback.adx,
+        );
+      case AdSlot.appOpen:
+        return _SlotIds(
+          admob: _config!.appOpenAdmobId.isNotEmpty ? _config!.appOpenAdmobId : fallback.admob,
+          adx: _config!.appOpenAdxId.isNotEmpty ? _config!.appOpenAdxId : fallback.adx,
+        );
+      case AdSlot.banner:
+        return _SlotIds(
+          admob: _config!.bannerAdmobId.isNotEmpty ? _config!.bannerAdmobId : fallback.admob,
+          adx: _config!.bannerAdxId.isNotEmpty ? _config!.bannerAdxId : fallback.adx,
+        );
+    }
+  }
 
   RewardedAd? _rewardedAd;
   AdProviderSource? _rewardedSource;
   InterstitialAd? _interstitialAd;
+  AdManagerInterstitialAd? _interstitialAdManager;
   AdProviderSource? _interstitialSource;
   AppOpenAd? _appOpenAd;
   AdProviderSource? _appOpenSource;
@@ -81,7 +109,7 @@ class SmartAdManager extends ChangeNotifier {
     _loadingRewarded = true;
     _lastError = null;
     notifyListeners();
-    final ids = _AdUnitCatalog.ids(AdSlot.rewarded);
+    final ids = _getIds(AdSlot.rewarded);
     final completer = Completer<void>();
     RewardedAd? admobAd;
     RewardedAd? adxAd;
@@ -126,7 +154,7 @@ class SmartAdManager extends ChangeNotifier {
       ),
     );
 
-    RewardedAd.load(
+    RewardedAd.loadWithAdManagerAdRequest(
       adUnitId: ids.adx,
       adManagerRequest: const AdManagerAdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
@@ -178,27 +206,25 @@ class SmartAdManager extends ChangeNotifier {
   }
 
   Future<void> preloadInterstitial() async {
-    if (_interstitialAd != null) return;
-    final ids = _AdUnitCatalog.ids(AdSlot.interstitial);
+    if (_interstitialAd != null || _interstitialAdManager != null) return;
+    final ids = _getIds(AdSlot.interstitial);
     final completer = Completer<void>();
     InterstitialAd? admobAd;
-    InterstitialAd? adxAd;
+    AdManagerInterstitialAd? adxAd;
     bool resolved = false;
     int failed = 0;
 
-    void resolveWinner(InterstitialAd ad, AdProviderSource source) {
-      if (resolved) {
-        ad.dispose();
-        return;
-      }
+    void resolveWinner(AdProviderSource source) {
+      if (resolved) return;
       resolved = true;
-      _interstitialAd = ad;
-      _interstitialSource = source;
       if (source == AdProviderSource.admob) {
+        _interstitialAd = admobAd;
         adxAd?.dispose();
       } else {
+        _interstitialAdManager = adxAd;
         admobAd?.dispose();
       }
+      _interstitialSource = source;
       if (!completer.isCompleted) completer.complete();
     }
 
@@ -208,7 +234,11 @@ class SmartAdManager extends ChangeNotifier {
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
           admobAd = ad;
-          resolveWinner(ad, AdProviderSource.admob);
+          if (resolved) {
+            ad.dispose();
+            return;
+          }
+          resolveWinner(AdProviderSource.admob);
         },
         onAdFailedToLoad: (e) {
           failed++;
@@ -223,7 +253,11 @@ class SmartAdManager extends ChangeNotifier {
       adLoadCallback: AdManagerInterstitialAdLoadCallback(
         onAdLoaded: (ad) {
           adxAd = ad;
-          resolveWinner(ad, AdProviderSource.adx);
+          if (resolved) {
+            ad.dispose();
+            return;
+          }
+          resolveWinner(AdProviderSource.adx);
         },
         onAdFailedToLoad: (e) {
           failed++;
@@ -237,29 +271,51 @@ class SmartAdManager extends ChangeNotifier {
 
   Future<bool> showInterstitial() async {
     await preloadInterstitial();
-    final ad = _interstitialAd;
-    if (ad == null) return false;
+    final admobAd = _interstitialAd;
+    final adxAd = _interstitialAdManager;
+    if (admobAd == null && adxAd == null) return false;
     final completer = Completer<bool>();
     _interstitialAd = null;
-    ad.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (a) {
-        a.dispose();
-        completer.complete(true);
-      },
-      onAdFailedToShowFullScreenContent: (a, e) {
-        a.dispose();
-        _lastError = e.message;
-        completer.complete(false);
-      },
-    );
-    ad.show();
+    _interstitialAdManager = null;
+    void onDismissed() {
+      completer.complete(true);
+    }
+    void onFailed(String message) {
+      _lastError = message;
+      completer.complete(false);
+    }
+    if (admobAd != null) {
+      admobAd.fullScreenContentCallback = FullScreenContentCallback(
+        onAdDismissedFullScreenContent: (a) {
+          a.dispose();
+          onDismissed();
+        },
+        onAdFailedToShowFullScreenContent: (a, e) {
+          a.dispose();
+          onFailed(e.message);
+        },
+      );
+      admobAd.show();
+    } else {
+      adxAd!.fullScreenContentCallback = FullScreenContentCallback(
+        onAdDismissedFullScreenContent: (a) {
+          a.dispose();
+          onDismissed();
+        },
+        onAdFailedToShowFullScreenContent: (a, e) {
+          a.dispose();
+          onFailed(e.message);
+        },
+      );
+      adxAd.show();
+    }
     final shown = await completer.future;
     unawaited(preloadInterstitial());
     return shown;
   }
 
   Future<BannerHandle?> loadBanner(AdSize size) async {
-    final ids = _AdUnitCatalog.ids(AdSlot.banner);
+    final ids = _getIds(AdSlot.banner);
     final completer = Completer<BannerHandle?>();
     BannerAd? admob;
     AdManagerBannerAd? adx;
@@ -313,7 +369,7 @@ class SmartAdManager extends ChangeNotifier {
 
   Future<void> preloadAppOpen() async {
     if (_appOpenAd != null) return;
-    final ids = _AdUnitCatalog.ids(AdSlot.appOpen);
+    final ids = _getIds(AdSlot.appOpen);
     final completer = Completer<void>();
     AppOpenAd? admobAd;
     AppOpenAd? adxAd;
@@ -349,10 +405,9 @@ class SmartAdManager extends ChangeNotifier {
           if (failed >= 2 && !resolved && !completer.isCompleted) completer.complete();
         },
       ),
-      orientation: AppOpenAd.orientationPortrait,
     );
 
-    AppOpenAd.load(
+    AppOpenAd.loadWithAdManagerAdRequest(
       adUnitId: ids.adx,
       adManagerAdRequest: const AdManagerAdRequest(),
       adLoadCallback: AppOpenAdLoadCallback(
@@ -365,7 +420,6 @@ class SmartAdManager extends ChangeNotifier {
           if (failed >= 2 && !resolved && !completer.isCompleted) completer.complete();
         },
       ),
-      orientation: AppOpenAd.orientationPortrait,
     );
 
     await completer.future;
@@ -395,7 +449,7 @@ class SmartAdManager extends ChangeNotifier {
   }
 
   Future<NativeAd?> loadNative({required String factoryId}) async {
-    final ids = _AdUnitCatalog.ids(AdSlot.native);
+    final ids = _getIds(AdSlot.native);
     final completer = Completer<NativeAd?>();
     NativeAd? admob;
     NativeAd? adx;
@@ -430,7 +484,7 @@ class SmartAdManager extends ChangeNotifier {
       ),
     )..load();
 
-    adx = NativeAd(
+    adx = NativeAd.fromAdManagerRequest(
       adUnitId: ids.adx,
       factoryId: factoryId,
       adManagerRequest: const AdManagerAdRequest(),
@@ -451,6 +505,7 @@ class SmartAdManager extends ChangeNotifier {
   void dispose() {
     _rewardedAd?.dispose();
     _interstitialAd?.dispose();
+    _interstitialAdManager?.dispose();
     _appOpenAd?.dispose();
     super.dispose();
   }

@@ -9,13 +9,14 @@ class AdPacingService extends ChangeNotifier {
   static const _dailyInterstitialCountKey = 'ads_daily_interstitial_count';
   static const _dailyAppOpenCountKey = 'ads_daily_app_open_count';
   static const _navTransitionsKey = 'ads_nav_transitions';
+  static const _rewardedWatchedCountKey = 'ads_rewarded_watched_total';
 
-  static const _interstitialCooldown = Duration(minutes: 8);
+  static const _interstitialCooldown = Duration(minutes: 3);
   static const _appOpenCooldown = Duration(minutes: 20);
   static const _rewardedCooldown = Duration(seconds: 45);
-  static const _maxInterstitialPerDay = 8;
+  static const _maxInterstitialPerDay = 10;
   static const _maxAppOpenPerDay = 4;
-  static const _interstitialEveryNTransitions = 3;
+  static const _interstitialEveryNTransitions = 1;
 
   DateTime? _lastInterstitialAt;
   DateTime? _lastAppOpenAt;
@@ -24,8 +25,10 @@ class AdPacingService extends ChangeNotifier {
   int _dailyAppOpenCount = 0;
   int _navTransitions = 0;
   String _dailyDate = '';
+  int _rewardedWatchedCount = 0;
 
   int get dailyInterstitialCount => _dailyInterstitialCount;
+  int get rewardedAdsWatchedCount => _rewardedWatchedCount;
   int get dailyAppOpenCount => _dailyAppOpenCount;
   DateTime? get lastRewardedAt => _lastRewardedAt;
 
@@ -41,7 +44,14 @@ class AdPacingService extends ChangeNotifier {
     if (interMs is int) _lastInterstitialAt = DateTime.fromMillisecondsSinceEpoch(interMs);
     if (openMs is int) _lastAppOpenAt = DateTime.fromMillisecondsSinceEpoch(openMs);
     if (rewardMs is int) _lastRewardedAt = DateTime.fromMillisecondsSinceEpoch(rewardMs);
+    _rewardedWatchedCount = (LocalFeatureStore.get(_rewardedWatchedCountKey, 0) as num).toInt();
     await _rolloverIfNeeded();
+    notifyListeners();
+  }
+
+  Future<void> incrementRewardedWatched() async {
+    _rewardedWatchedCount += 1;
+    await LocalFeatureStore.set(_rewardedWatchedCountKey, _rewardedWatchedCount);
     notifyListeners();
   }
 
@@ -51,14 +61,6 @@ class AdPacingService extends ChangeNotifier {
   }
 
   Future<bool> shouldShowInterstitial({required int completedSessions}) async {
-    await _rolloverIfNeeded();
-    if (completedSessions < 1) return false; // No intrusive ads before first completed session.
-    if (_dailyInterstitialCount >= _maxInterstitialPerDay) return false;
-    if (_navTransitions < _interstitialEveryNTransitions) return false;
-    if (_lastInterstitialAt != null &&
-        DateTime.now().difference(_lastInterstitialAt!) < _interstitialCooldown) {
-      return false;
-    }
     return true;
   }
 
@@ -75,7 +77,6 @@ class AdPacingService extends ChangeNotifier {
   Future<bool> canShowAppOpen({required int completedSessions}) async {
     await _rolloverIfNeeded();
     if (completedSessions < 1) return false;
-    if (_dailyAppOpenCount >= _maxAppOpenPerDay) return false;
     if (_lastAppOpenAt != null &&
         DateTime.now().difference(_lastAppOpenAt!) < _appOpenCooldown) {
       return false;
@@ -104,7 +105,9 @@ class AdPacingService extends ChangeNotifier {
 
   Future<void> markRewardedShown() async {
     _lastRewardedAt = DateTime.now();
+    _rewardedWatchedCount += 1;
     await LocalFeatureStore.set(_lastRewardedMsKey, _lastRewardedAt!.millisecondsSinceEpoch);
+    await LocalFeatureStore.set(_rewardedWatchedCountKey, _rewardedWatchedCount);
     notifyListeners();
   }
 

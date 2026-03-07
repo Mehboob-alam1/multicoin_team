@@ -77,8 +77,7 @@ class LeaderboardService extends ChangeNotifier {
               farmSize: (d.data()['farmSize'] as num?)?.toInt() ?? 0,
             ))
         .toList();
-    list.sort((a, b) => b.totalMined.compareTo(a.totalMined));
-    _cached = list;
+    _cached = List.from(list);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_cacheKey, jsonEncode(_cached.map((e) => e.toJson()).toList()));
     notifyListeners();

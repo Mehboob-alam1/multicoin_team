@@ -57,6 +57,11 @@ class GameStateService extends ChangeNotifier {
   bool get canBuyMoreRigs => _data.ownedRigIds.length < rigCapacity;
 
   double get totalBtcPerMin {
+    return _totalBtcPerMinWithSession(isSessionActive);
+  }
+
+  /// Rate in BTC/min. When [sessionActive] true, applies 1.25× session bonus.
+  double _totalBtcPerMinWithSession(bool sessionActive) {
     double sum = 0;
     for (final id in _data.ownedRigIds) {
       final rig = MiningRigs.byId(id);
@@ -65,7 +70,7 @@ class GameStateService extends ChangeNotifier {
     double mult = 1.0;
     mult *= currentFarmTier.miningMultiplier;
     mult *= _oneTimeMiningMultiplier();
-    if (isSessionActive) mult *= 1.25;
+    if (sessionActive) mult *= 1.25;
     if (isBoostActive) mult *= 2.0;
     if (isPremiumActive) mult *= 1.5;
     mult *= _eventMiningMultiplier;
@@ -194,6 +199,41 @@ class GameStateService extends ChangeNotifier {
     final diff = now.difference(closed);
     final minutes = diff.inMinutes.clamp(0, _maxIdleMinutes);
     return totalBtcPerMin * minutes;
+  }
+
+  /// Call when app resumes from background. Applies mining earnings for time away (capped at _maxIdleMinutes).
+  /// Session does not end when app is closed: earnings use 1.25× for the portion of absence while session was still active.
+  Future<void> applyIdleEarningsOnResume() async {
+    final closed = _data.lastClosedAt;
+    if (closed == null) return;
+    final now = DateTime.now();
+    final minutesAway = now.difference(closed).inMinutes.clamp(0, _maxIdleMinutes);
+    final sessionEndsAt = _data.miningSessionEndsAt;
+
+    double earned = 0;
+    if (sessionEndsAt != null && sessionEndsAt.isAfter(closed)) {
+      final minutesSessionActive = minutesAway.clamp(0, sessionEndsAt.difference(closed).inMinutes);
+      final minutesNormal = minutesAway - minutesSessionActive;
+      final rateWithSession = _totalBtcPerMinWithSession(true);
+      final rateWithoutSession = _totalBtcPerMinWithSession(false);
+      earned = rateWithSession * minutesSessionActive + rateWithoutSession * minutesNormal;
+    } else {
+      earned = _totalBtcPerMinWithSession(false) * minutesAway;
+    }
+
+    if (earned > 0) {
+      _data = _data.copyWith(
+        btcBalance: _data.btcBalance + earned,
+        lifetimeMinedBtc: _data.lifetimeMinedBtc + earned,
+        lastClosedAt: null,
+      );
+      await _persist(forceRemote: false, markDirty: true);
+      notifyListeners();
+    } else {
+      _data = _data.copyWith(lastClosedAt: null);
+      await _persist(forceRemote: false, markDirty: false);
+      notifyListeners();
+    }
   }
 
   Future<void> _persist({bool forceRemote = false, bool markDirty = true}) async {

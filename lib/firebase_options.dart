@@ -41,17 +41,22 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyAE2K8dZf4jLAB7BgLLY5SCKCSyOJFv1kE',
-    appId: '1:1079258737071:android:43ce8eea6b5bcbe77aa75a',
+    appId: '1:1079258737071:android:9e8de2b17e9084c37aa75a',
     messagingSenderId: '1079258737071',
     projectId: 'btcteam-a274d',
+    databaseURL: 'https://btcteam-a274d-default-rtdb.firebaseio.com',
     storageBucket: 'btcteam-a274d.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCVhfOeGUt7n9TLjaZ-NzgDBL5KPWI3i-4',
-    appId: '1:1079258737071:ios:66354cc20c9d0bb67aa75a',
+    appId: '1:1079258737071:ios:08d27a1a70df88027aa75a',
     messagingSenderId: '1079258737071',
     projectId: 'btcteam-a274d',
+    databaseURL: 'https://btcteam-a274d-default-rtdb.firebaseio.com',
     storageBucket: 'btcteam-a274d.firebasestorage.app',
+    iosClientId: '1079258737071-qmmd7oacpij6c8km1pbdga6t4h8h7teq.apps.googleusercontent.com',
+    iosBundleId: 'com.bitcoin.crypto.mining.hashrate.rigs.pro.news.app',
   );
+
 }

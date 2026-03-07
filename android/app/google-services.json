@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1079258737071",
+    "firebase_url": "https://btcteam-a274d-default-rtdb.firebaseio.com",
+    "project_id": "btcteam-a274d",
+    "storage_bucket": "btcteam-a274d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1079258737071:android:9e8de2b17e9084c37aa75a",
+        "android_client_info": {
+          "package_name": "com.bitcoin.crypto.mining.hashrate.rigs.pro.news.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1079258737071-55761c3o6tcl9og6rinqjsbv3m4dig0u.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAE2K8dZf4jLAB7BgLLY5SCKCSyOJFv1kE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1079258737071-55761c3o6tcl9og6rinqjsbv3m4dig0u.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1079258737071-1vo0oi19h2tagd7okrb5p5p565k66b3d.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.btcSim"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

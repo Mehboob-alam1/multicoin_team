@@ -1,13 +1,66 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../models/mining_rig.dart';
 import '../models/shop_product.dart';
 import '../services/event_service.dart';
 import '../services/game_state_service.dart';
+import '../services/ad_remote_config_service.dart';
 import '../services/iap_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/minimizable_native_ad.dart';
 
+// ─── Design tokens ────────────────────────────────────────────────────────────
+class _D {
+  static const bg       = Color(0xFF080B12);
+  static const surface  = Color(0xFF0E1420);
+  static const card     = Color(0xFF121826);
+  static const cardBord = Color(0xFF1E2A3A);
+  static const gold     = Color(0xFFF5A623);
+  static const goldDark = Color(0xFFE08800);
+  static const electric = Color(0xFF00D4FF);
+  static const green    = Color(0xFF00E5A0);
+  static const purple   = Color(0xFFB06EFF);
+  static const pink     = Color(0xFFFF6B9D);
+  static const orange   = Color(0xFFFF9A3C);
+  static const textHi   = Color(0xFFF0F4FF);
+  static const textMid  = Color(0xFF8899BB);
+  static const textLow  = Color(0xFF3D4F6B);
+}
+
+// ─── Rig metadata ─────────────────────────────────────────────────────────────
+class _RigMeta {
+  final IconData icon;
+  final Color accent;
+  final String tier;
+  const _RigMeta(this.icon, this.accent, this.tier);
+}
+
+_RigMeta _metaForRig(String id) => switch (id) {
+  'gpu_rig'        => const _RigMeta(Icons.memory_rounded,       _D.green,    'Tier II'),
+  'mining_rack'    => const _RigMeta(Icons.view_module_rounded,  _D.electric, 'Tier III'),
+  'warehouse_farm' => const _RigMeta(Icons.warehouse_rounded,    _D.gold,     'Tier IV'),
+  'mega_facility'  => const _RigMeta(Icons.auto_awesome_rounded, _D.purple,   'Tier V'),
+  _                => const _RigMeta(Icons.hardware_rounded,     _D.textMid,  ''),
+};
+
+// ─── Tab model ────────────────────────────────────────────────────────────────
+class _Tab {
+  final String label;
+  final IconData icon;
+  final Color accent;
+  const _Tab(this.label, this.icon, this.accent);
+}
+
+const _tabs = [
+  _Tab('Rigs',     Icons.memory_rounded,              _D.electric),
+  _Tab('One-time', Icons.card_giftcard_rounded,        _D.gold),
+  _Tab('Premium',  Icons.workspace_premium_rounded,    _D.purple),
+];
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 class ShopScreen extends StatefulWidget {
   const ShopScreen({super.key});
 
@@ -15,14 +68,10 @@ class ShopScreen extends StatefulWidget {
   State<ShopScreen> createState() => _ShopScreenState();
 }
 
-class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
+class _ShopScreenState extends State<ShopScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController =
+  TabController(length: 3, vsync: this);
 
   @override
   void dispose() {
@@ -32,285 +81,432 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    final game = context.watch<GameStateService>();
-    final iap = context.watch<IapService>();
+    final game   = context.watch<GameStateService>();
+    final iap    = context.watch<IapService>();
     final events = context.watch<EventService>();
+    final adCfg  = context.watch<AdRemoteConfigService>();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Shop'),
-        actions: [
-          TextButton.icon(
-            onPressed: iap.loading ? null : () => iap.restorePurchases(),
-            icon: const Icon(Icons.restore, size: 20),
-            label: const Text('Restore'),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Center(
+    return Theme(
+      data: _darkTheme(),
+      child: Scaffold(
+        backgroundColor: _D.bg,
+        body: Stack(
+          children: [
+            // Ambient glows
+            Positioned(
+              top: -60,
+              right: -80,
+              child: _Blob(color: _D.gold.withValues(alpha: 0.06), size: 320),
+            ),
+            Positioned(
+              bottom: 80,
+              left: -60,
+              child: _Blob(color: _D.purple.withValues(alpha: 0.05), size: 260),
+            ),
+
+            SafeArea(
               child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    '${game.btcBalance.toStringAsFixed(4)} BTC',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppTheme.primary),
+                  // ── App bar ──────────────────────────────────────────
+                  _ShopAppBar(game: game, iap: iap),
+
+                  // ── Hero card ────────────────────────────────────────
+                  _HeroCard(game: game),
+                  const SizedBox(height: 4),
+
+                  // ── Ad ───────────────────────────────────────────────
+                  if (adCfg.adsActive)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                      child: MinimizableNativeAd(title: 'Sponsored deal'),
+                    ),
+
+                  // ── Tab bar ──────────────────────────────────────────
+                  _ShopTabBar(controller: _tabController),
+                  const SizedBox(height: 4),
+
+                  // ── Tab views ────────────────────────────────────────
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _RigsTab(game: game, events: events),
+                        _OneTimeTab(game: game, iap: iap),
+                        _PremiumTab(game: game, iap: iap),
+                      ],
+                    ),
                   ),
-                  if (game.isPremiumActive)
-                    Text('PREMIUM', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppTheme.btcGold)),
                 ],
               ),
             ),
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Rigs', icon: Icon(Icons.memory, size: 20)),
-            Tab(text: 'One-time', icon: Icon(Icons.card_giftcard, size: 20)),
-            Tab(text: 'Premium', icon: Icon(Icons.workspace_premium, size: 20)),
           ],
         ),
       ),
-      body: Column(
-        children: [
-          _MonetizationHeroCard(game: game),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(12, 0, 12, 6),
-            child: MinimizableNativeAd(title: 'Sponsored deal'),
-          ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _RigsTab(game: game, eventService: events),
-                _OneTimeTab(game: game, iap: iap),
-                _PremiumTab(game: game, iap: iap),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
 
-class _MonetizationHeroCard extends StatelessWidget {
-  final GameStateService game;
-  const _MonetizationHeroCard({required this.game});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-      child: Card(
-        color: AppTheme.primary.withValues(alpha: 0.12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              const Icon(Icons.trending_up, color: AppTheme.primary),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      game.isPremiumActive ? 'Boost your premium further' : 'Grow faster with packs & premium',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppTheme.primary),
-                    ),
-                    Text(
-                      game.isPremiumActive
-                          ? 'Extend premium for longer 1.5x gains and better compounding.'
-                          : 'Starter packs and premium reduce grind time and unlock stronger mining early.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RigsTab extends StatelessWidget {
-  final GameStateService game;
-  final EventService eventService;
-
-  const _RigsTab({required this.game, required this.eventService});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (eventService.rigDiscount > 0)
-          Card(
-            color: AppTheme.btcGold.withValues(alpha: 0.18),
-            child: ListTile(
-              leading: const Icon(Icons.local_offer, color: AppTheme.btcGold),
-              title: Text('${(eventService.rigDiscount * 100).toStringAsFixed(0)}% Rig Sale Event'),
-              subtitle: const Text('Weekly event active from Firebase config'),
-            ),
-          ),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.auto_graph, color: AppTheme.primary),
-            title: const Text('Compounding tip'),
-            subtitle: const Text(
-              'Earlier rig upgrades snowball your BTC output. Buy capacity and rate upgrades first.',
-            ),
-          ),
-        ),
-        ...MiningRigs.all.where((r) => r.costBtc > 0).map((rig) {
-        final canBuy = game.canAfford(rig) && game.canBuyMoreRigs;
-        final cost = game.rigCost(rig);
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Card(
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: AppTheme.primary.withValues(alpha: 0.3),
-                child: Icon(_iconForRig(rig.id), color: AppTheme.primary),
-              ),
-              title: Text(rig.name),
-              subtitle: Text(
-                '${rig.btcPerMin} BTC/min · ${cost.toStringAsFixed(6)} BTC${!canBuy ? " · You have ${game.btcBalance.toStringAsFixed(6)} BTC" : ""}',
-              ),
-              trailing: ElevatedButton(
-                onPressed: () async {
-                  if (!canBuy) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            !game.canBuyMoreRigs
-                                ? 'Farm capacity reached. Upgrade farm first.'
-                                : 'Need ${cost.toStringAsFixed(6)} BTC. You have ${game.btcBalance.toStringAsFixed(6)} BTC. Keep mining!',
-                          ),
-                        ),
-                      );
-                    }
-                    return;
-                  }
-                  await game.buyRig(rig);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Purchased: ${rig.name}')),
-                    );
-                  }
-                },
-                child: const Text('Buy'),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-      ],
-    );
-  }
-
-  IconData _iconForRig(String id) {
-    switch (id) {
-      case 'gpu_rig': return Icons.memory;
-      case 'mining_rack': return Icons.view_module;
-      case 'warehouse_farm': return Icons.warehouse;
-      case 'mega_facility': return Icons.diamond;
-      default: return Icons.hardware;
-    }
-  }
-}
-
-class _OneTimeTab extends StatelessWidget {
+// ─── App bar ──────────────────────────────────────────────────────────────────
+class _ShopAppBar extends StatelessWidget {
   final GameStateService game;
   final IapService iap;
+  const _ShopAppBar({required this.game, required this.iap});
 
-  const _OneTimeTab({required this.game, required this.iap});
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 12, 12, 4),
+    child: Row(children: [
+      const Icon(Icons.shopping_bag_rounded, color: _D.gold, size: 20),
+      const SizedBox(width: 10),
+      const Text(
+        'SHOP',
+        style: TextStyle(
+          color: _D.gold,
+          fontFamily: AppTheme.fontFamily,
+          fontWeight: FontWeight.w700,
+          fontSize: 15,
+          letterSpacing: 2.5,
+        ),
+      ),
+      const Spacer(),
+      // Balance pill
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: _D.gold.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _D.gold.withValues(alpha: 0.3)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.currency_bitcoin, color: _D.gold, size: 14),
+          const SizedBox(width: 4),
+          Text(
+            game.btcBalance.toStringAsFixed(4),
+            style: const TextStyle(
+              color: _D.gold,
+              fontFamily: AppTheme.fontFamily,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+        ]),
+      ),
+      const SizedBox(width: 8),
+      // Restore button
+      GestureDetector(
+        onTap: iap.loading ? null : () => iap.restorePurchases(),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: _D.cardBord,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            Icons.restore_rounded,
+            color: iap.loading ? _D.textLow : _D.textMid,
+            size: 18,
+          ),
+        ),
+      ),
+    ]),
+  );
+}
+
+// ─── Hero card ────────────────────────────────────────────────────────────────
+class _HeroCard extends StatelessWidget {
+  final GameStateService game;
+  const _HeroCard({required this.game});
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (iap.error != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Card(
-              color: Colors.orange.withValues(alpha: 0.2),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(iap.error!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.orange)),
-              ),
-            ),
-          ),
-        Card(
-          color: AppTheme.btcGold.withValues(alpha: 0.12),
-          child: const ListTile(
-            leading: Icon(Icons.local_fire_department, color: AppTheme.btcGold),
-            title: Text('Limited-time value'),
-            subtitle: Text('One-time packs give instant mining acceleration and stack with premium.'),
+    final isPremium = game.isPremiumActive;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isPremium
+              ? _D.gold.withValues(alpha: 0.08)
+              : _D.card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isPremium
+                ? _D.gold.withValues(alpha: 0.35)
+                : _D.cardBord,
           ),
         ),
-        ...ShopProducts.oneTime.map((product) {
-          final purchased = game.hasPurchasedOneTime(product.id);
-          final canBuyBtc = product.isBtcPrice && game.btcBalance >= _parseBtcPrice(product.price);
-          final storeProduct = iap.getProduct(product.id);
-          final priceStr = storeProduct?.price ?? product.price;
+        child: Row(children: [
+          Icon(
+            isPremium ? Icons.workspace_premium_rounded : Icons.trending_up_rounded,
+            color: isPremium ? _D.gold : _D.electric,
+            size: 22,
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              isPremium ? 'Premium active — extend for more gains' : 'Grow faster with packs & premium',
+              style: TextStyle(
+                color: isPremium ? _D.gold : _D.textHi,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              isPremium
+                  ? 'Stack boosts and events on top of your 1.5× rate.'
+                  : 'Starter packs and premium cut grind time significantly.',
+              style: const TextStyle(color: _D.textMid, fontSize: 11),
+            ),
+          ])),
+          if (isPremium) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _D.gold.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _D.gold.withValues(alpha: 0.35)),
+              ),
+              child: const Text('ACTIVE',
+                  style: TextStyle(color: _D.gold, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1)),
+            ),
+          ],
+        ]),
+      ),
+    );
+  }
+}
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(product.icon, style: const TextStyle(fontSize: 32)),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(product.name, style: Theme.of(context).textTheme.titleMedium),
-                              Text(product.description, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70)),
-                            ],
-                          ),
-                        ),
-                        Text(priceStr, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppTheme.primary)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: purchased
-                            ? null
-                            : (product.isBtcPrice ? canBuyBtc : true)
-                                ? () => _onPurchase(context, product)
-                                : null,
-                        child: Text(
-                          purchased
-                              ? 'Owned'
-                              : product.isBtcPrice
-                                  ? 'Buy with BTC'
-                                  : (iap.available && storeProduct != null ? 'Buy' : 'Claim'),
-                        ),
-                      ),
-                    ),
-                  ],
+// ─── Custom tab bar ───────────────────────────────────────────────────────────
+class _ShopTabBar extends StatelessWidget {
+  final TabController controller;
+  const _ShopTabBar({required this.controller});
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: controller,
+    builder: (_, __) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: List.generate(_tabs.length, (i) {
+          final t       = _tabs[i];
+          final active  = controller.index == i;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => controller.animateTo(i),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: EdgeInsets.only(right: i < _tabs.length - 1 ? 8 : 0),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: active ? t.accent.withValues(alpha: 0.14) : _D.card,
+                  borderRadius: BorderRadius.circular(11),
+                  border: Border.all(
+                    color: active ? t.accent.withValues(alpha: 0.5) : _D.cardBord,
+                    width: active ? 1.5 : 1,
+                  ),
                 ),
+                child: Column(children: [
+                  Icon(t.icon, color: active ? t.accent : _D.textLow, size: 18),
+                  const SizedBox(height: 4),
+                  Text(
+                    t.label,
+                    style: TextStyle(
+                      color: active ? t.accent : _D.textLow,
+                      fontSize: 11,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.normal,
+                    ),
+                  ),
+                ]),
               ),
             ),
           );
         }),
+      ),
+    ),
+  );
+}
+
+// ─── Rigs tab ─────────────────────────────────────────────────────────────────
+class _RigsTab extends StatelessWidget {
+  final GameStateService game;
+  final EventService events;
+  const _RigsTab({required this.game, required this.events});
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    physics: const BouncingScrollPhysics(),
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+    children: [
+      // Sale banner
+      if (events.rigDiscount > 0) ...[
+        _SaleBanner(discount: events.rigDiscount),
+        const SizedBox(height: 10),
       ],
-    );
-  }
+
+      // Tip card
+      _TipCard(
+        icon:    Icons.auto_graph_rounded,
+        accent:  _D.electric,
+        text:    'Earlier rig upgrades snowball your BTC output. Buy capacity and rate upgrades first.',
+      ),
+      const SizedBox(height: 14),
+
+      _SectionLabel(label: 'AVAILABLE RIGS'),
+      const SizedBox(height: 10),
+
+      ...MiningRigs.all.where((r) => r.costBtc > 0).map((rig) {
+        final meta   = _metaForRig(rig.id);
+        final canBuy = game.canAfford(rig) && game.canBuyMoreRigs;
+        final cost   = game.rigCost(rig);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _RigShopCard(
+            rig:    rig,
+            meta:   meta,
+            cost:   cost,
+            canBuy: canBuy,
+            isFull: !game.canBuyMoreRigs,
+            onTap: () async {
+              if (!canBuy) {
+                _toast(context, !game.canBuyMoreRigs
+                    ? 'Farm capacity reached — upgrade first.'
+                    : 'Need ${cost.toStringAsFixed(6)} BTC · You have ${game.btcBalance.toStringAsFixed(6)} BTC');
+                return;
+              }
+              await game.buyRig(rig);
+              if (context.mounted) _toast(context, '${rig.name} added to farm!');
+            },
+          ),
+        );
+      }),
+    ],
+  );
+}
+
+class _RigShopCard extends StatelessWidget {
+  final MiningRig rig;
+  final _RigMeta meta;
+  final double cost;
+  final bool canBuy;
+  final bool isFull;
+  final VoidCallback onTap;
+  const _RigShopCard({
+    required this.rig,
+    required this.meta,
+    required this.cost,
+    required this.canBuy,
+    required this.isFull,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: _D.card,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _D.cardBord),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Row(children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: meta.accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: meta.accent.withValues(alpha: 0.25)),
+          ),
+          child: Icon(meta.icon, color: meta.accent, size: 22),
+        ),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(
+              child: Text(rig.name,
+                  style: const TextStyle(color: _D.textHi, fontWeight: FontWeight.w700, fontSize: 14),
+                  overflow: TextOverflow.ellipsis),
+            ),
+            if (meta.tier.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              _Pill(label: meta.tier, color: meta.accent),
+            ],
+          ]),
+          const SizedBox(height: 4),
+          Row(children: [
+            Icon(Icons.bolt_rounded, color: meta.accent, size: 12),
+            const SizedBox(width: 3),
+            Flexible(
+              child: Text('${rig.btcPerMin} BTC/min',
+                  style: TextStyle(color: meta.accent, fontFamily: AppTheme.fontFamily, fontSize: 11, fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis),
+            ),
+            const SizedBox(width: 10),
+            const Icon(Icons.currency_bitcoin, color: _D.textMid, size: 12),
+            Flexible(
+              child: Text(cost.toStringAsFixed(6),
+                  style: const TextStyle(color: _D.textMid, fontFamily: AppTheme.fontFamily, fontSize: 11),
+                  overflow: TextOverflow.ellipsis),
+            ),
+          ]),
+        ])),
+        const SizedBox(width: 10),
+        _BuyBtn(canBuy: canBuy, isFull: isFull, onTap: onTap),
+      ]),
+    ),
+  );
+}
+
+// ─── One-time tab ─────────────────────────────────────────────────────────────
+class _OneTimeTab extends StatelessWidget {
+  final GameStateService game;
+  final IapService iap;
+  const _OneTimeTab({required this.game, required this.iap});
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    physics: const BouncingScrollPhysics(),
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+    children: [
+      if (iap.error != null) ...[
+        _ErrorBanner(message: iap.error!),
+        const SizedBox(height: 10),
+      ],
+
+      _TipCard(
+        icon:   Icons.local_fire_department_rounded,
+        accent: _D.gold,
+        text:   'One-time packs give instant mining acceleration and stack with premium.',
+      ),
+      const SizedBox(height: 14),
+
+      _SectionLabel(label: 'PACKS'),
+      const SizedBox(height: 10),
+
+      ...ShopProducts.oneTime.map((product) {
+        final purchased    = game.hasPurchasedOneTime(product.id);
+        final storeProduct = iap.getProduct(product.id);
+        final priceStr     = storeProduct?.price ?? product.price;
+        final canBuyBtc    = product.isBtcPrice &&
+            game.btcBalance >= _parseBtcPrice(product.price);
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _OneTimeCard(
+            product:    product,
+            priceStr:   priceStr,
+            purchased:  purchased,
+            canBuy:     product.isBtcPrice ? canBuyBtc : true,
+            iapAvail:   iap.available && storeProduct != null,
+            onPurchase: () => _onPurchase(context, product),
+          ),
+        );
+      }),
+    ],
+  );
 
   double _parseBtcPrice(String price) {
     final s = price.replaceAll(RegExp(r'[^\d.]'), '');
@@ -321,131 +517,149 @@ class _OneTimeTab extends StatelessWidget {
     if (product.isBtcPrice) {
       const cost = 0.00005;
       if (!game.canSpendBtc(cost)) {
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Need 0.00005 BTC')));
-        return;
+        _toast(context, 'Need 0.00005 BTC'); return;
       }
       await game.deductBtc(cost);
       await game.activateBoost1h();
       await game.applyOneTimePurchase(productId: product.id);
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('2x Boost active for 1 hour!')));
+      if (context.mounted) _toast(context, '⚡ 2× Boost active for 1 hour!');
       return;
     }
     final useStore = iap.available && iap.getProduct(product.id) != null;
     if (useStore) {
       final success = await iap.buyProduct(product.id);
       if (context.mounted) {
-        if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Complete purchase in the store. Reward will apply when done.')));
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(iap.error ?? 'Purchase failed')));
-        }
+        _toast(context, success
+            ? 'Complete purchase in the store.'
+            : (iap.error ?? 'Purchase failed'));
       }
       return;
     }
     await game.applyOneTimePurchase(
-      productId: product.id,
-      btcAmount: product.btcAmount,
-      rigId: product.rigId,
-    );
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Claimed: ${product.name}')));
-    }
+        productId: product.id, btcAmount: product.btcAmount, rigId: product.rigId);
+    if (context.mounted) _toast(context, 'Claimed: ${product.name}');
   }
 }
 
+class _OneTimeCard extends StatelessWidget {
+  final OneTimeProduct product;
+  final String priceStr;
+  final bool purchased;
+  final bool canBuy;
+  final bool iapAvail;
+  final VoidCallback onPurchase;
+  const _OneTimeCard({
+    required this.product,
+    required this.priceStr,
+    required this.purchased,
+    required this.canBuy,
+    required this.iapAvail,
+    required this.onPurchase,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: purchased ? _D.green.withValues(alpha: 0.05) : _D.card,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: purchased ? _D.green.withValues(alpha: 0.25) : _D.cardBord,
+      ),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Text(product.icon, style: const TextStyle(fontSize: 30)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(product.name,
+                style: const TextStyle(color: _D.textHi, fontWeight: FontWeight.w700, fontSize: 15)),
+            const SizedBox(height: 2),
+            Text(product.description,
+                style: const TextStyle(color: _D.textMid, fontSize: 12)),
+          ])),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: _D.gold.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _D.gold.withValues(alpha: 0.3)),
+            ),
+            child: Text(
+              priceStr,
+              style: const TextStyle(
+                color: _D.gold,
+                fontFamily: AppTheme.fontFamily,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          child: _GoldBtn(
+            label: purchased
+                ? 'Owned'
+                : product.isBtcPrice
+                ? 'Buy with BTC'
+                : (iapAvail ? 'Buy' : 'Claim'),
+            enabled: !purchased && canBuy,
+            onTap: onPurchase,
+            showCheck: purchased,
+          ),
+        ),
+      ]),
+    ),
+  );
+}
+
+// ─── Premium tab ──────────────────────────────────────────────────────────────
 class _PremiumTab extends StatelessWidget {
   final GameStateService game;
   final IapService iap;
-
   const _PremiumTab({required this.game, required this.iap});
 
   @override
   Widget build(BuildContext context) {
     final isPremium = game.isPremiumActive;
-    final expiry = game.isPremiumActive ? _formatExpiry(game.premiumExpiry) : null;
+    final expiry    = game.isPremiumActive ? _formatExpiry(game.premiumExpiry) : null;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       children: [
-        if (isPremium)
-          Card(
-            color: AppTheme.btcGold.withValues(alpha: 0.2),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Icon(Icons.workspace_premium, color: AppTheme.btcGold, size: 40),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Premium active', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.btcGold)),
-                        Text('1.5x mining rate · No ads${expiry != null ? " · Until $expiry" : ""}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        // Active badge
+        if (isPremium) ...[
+          _PremiumActiveBadge(expiry: expiry),
+          const SizedBox(height: 14),
+        ] else ...[
+          _TipCard(
+            icon:   Icons.workspace_premium_rounded,
+            accent: _D.purple,
+            text:   'Premium adds 1.5× mining speed continuously and combines with boosts and events.',
           ),
-        if (isPremium) const SizedBox(height: 16),
-        if (!isPremium)
-          Card(
-            color: AppTheme.btcGold.withValues(alpha: 0.14),
-            child: const ListTile(
-              leading: Icon(Icons.workspace_premium, color: AppTheme.btcGold),
-              title: Text('Best long-term value'),
-              subtitle: Text('Premium adds 1.5x mining speed continuously and combines with boosts/events.'),
-            ),
-          ),
+          const SizedBox(height: 14),
+        ],
+
+        _SectionLabel(label: 'PLANS'),
+        const SizedBox(height: 10),
+
         ...ShopProducts.premiumPlans.map((plan) {
           final storeProduct = iap.getProduct(plan.id);
-          final priceStr = storeProduct?.price ?? plan.price;
+          final priceStr     = storeProduct?.price ?? plan.price;
           return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.workspace_premium, color: AppTheme.primary, size: 28),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(plan.name, style: Theme.of(context).textTheme.titleMedium),
-                              Text(plan.description, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70)),
-                            ],
-                          ),
-                        ),
-                        Text(priceStr, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: AppTheme.primary)),
-                      ],
-                    ),
-                    if (plan.benefits.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: plan.benefits.map((b) => Chip(label: Text(b, style: const TextStyle(fontSize: 11)), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap)).toList(),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () => _subscribe(context, plan),
-                        icon: const Icon(Icons.star, size: 20),
-                        label: Text(iap.loading ? 'Loading...' : (isPremium ? 'Extend' : (iap.available && storeProduct != null ? 'Subscribe' : 'Claim'))),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _PremiumPlanCard(
+              plan:        plan,
+              priceStr:    priceStr,
+              isPremium:   isPremium,
+              iapLoading:  iap.loading,
+              iapAvail:    iap.available && storeProduct != null,
+              onSubscribe: () => _subscribe(context, plan),
             ),
           );
         }),
@@ -453,24 +667,425 @@ class _PremiumTab extends StatelessWidget {
     );
   }
 
-  String _formatExpiry(DateTime? e) => e != null ? '${e.day}/${e.month}/${e.year}' : '';
+  String _formatExpiry(DateTime? e) =>
+      e != null ? '${e.day}/${e.month}/${e.year}' : '';
 
   Future<void> _subscribe(BuildContext context, PremiumPlan plan) async {
     final useStore = iap.available && iap.getProduct(plan.id) != null;
     if (useStore) {
       final success = await iap.buySubscription(plan.id);
       if (context.mounted) {
-        if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Complete in the store. Premium will activate when done.')));
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(iap.error ?? 'Purchase failed')));
-        }
+        _toast(context, success
+            ? 'Complete in the store. Premium activates when done.'
+            : (iap.error ?? 'Purchase failed'));
       }
       return;
     }
     await game.activatePremium(plan.id, plan.durationDays);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${plan.name} activated!')));
-    }
+    if (context.mounted) _toast(context, '⭐ ${plan.name} activated!');
   }
 }
+
+class _PremiumActiveBadge extends StatelessWidget {
+  final String? expiry;
+  const _PremiumActiveBadge({required this.expiry});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xFF1E1800), Color(0xFF120F00)],
+      ),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _D.gold.withValues(alpha: 0.4)),
+      boxShadow: [BoxShadow(color: _D.gold.withValues(alpha: 0.12), blurRadius: 20)],
+    ),
+    child: Row(children: [
+      Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: _D.gold.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(Icons.workspace_premium_rounded, color: _D.gold, size: 24),
+      ),
+      const SizedBox(width: 14),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Premium Active',
+            style: TextStyle(color: _D.gold, fontWeight: FontWeight.w800, fontSize: 15)),
+        const SizedBox(height: 2),
+        Text(
+          '1.5× mining rate · No ads${expiry != null ? ' · Until $expiry' : ''}',
+          style: const TextStyle(color: _D.textMid, fontSize: 12),
+        ),
+      ])),
+    ]),
+  );
+}
+
+class _PremiumPlanCard extends StatelessWidget {
+  final PremiumPlan plan;
+  final String priceStr;
+  final bool isPremium;
+  final bool iapLoading;
+  final bool iapAvail;
+  final VoidCallback onSubscribe;
+  const _PremiumPlanCard({
+    required this.plan,
+    required this.priceStr,
+    required this.isPremium,
+    required this.iapLoading,
+    required this.iapAvail,
+    required this.onSubscribe,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: _D.card,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _D.cardBord),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: _D.purple.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: _D.purple.withValues(alpha: 0.25)),
+            ),
+            child: const Icon(Icons.workspace_premium_rounded, color: _D.purple, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(plan.name,
+                style: const TextStyle(color: _D.textHi, fontWeight: FontWeight.w700, fontSize: 15)),
+            const SizedBox(height: 2),
+            Text(plan.description,
+                style: const TextStyle(color: _D.textMid, fontSize: 12)),
+          ])),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: _D.purple.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _D.purple.withValues(alpha: 0.3)),
+            ),
+            child: Text(
+              priceStr,
+              style: const TextStyle(
+                color: _D.purple,
+                fontFamily: AppTheme.fontFamily,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ]),
+
+        if (plan.benefits.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: plan.benefits.map((b) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _D.purple.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(color: _D.purple.withValues(alpha: 0.2)),
+              ),
+              child: Text(b, style: const TextStyle(color: _D.purple, fontSize: 11, fontWeight: FontWeight.w600)),
+            )).toList(),
+          ),
+        ],
+
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          child: _PurpleBtn(
+            label: iapLoading
+                ? 'Loading…'
+                : isPremium
+                ? 'Extend'
+                : (iapAvail ? 'Subscribe' : 'Claim'),
+            onTap: onSubscribe,
+          ),
+        ),
+      ]),
+    ),
+  );
+}
+
+// ─── Shared small components ──────────────────────────────────────────────────
+class _SaleBanner extends StatelessWidget {
+  final double discount;
+  const _SaleBanner({required this.discount});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    decoration: BoxDecoration(
+      color: _D.orange.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: _D.orange.withValues(alpha: 0.35)),
+    ),
+    child: Row(children: [
+      const Icon(Icons.local_offer_rounded, color: _D.orange, size: 18),
+      const SizedBox(width: 8),
+      Text(
+        '${(discount * 100).toStringAsFixed(0)}% Rig Sale — Weekly event active!',
+        style: const TextStyle(color: _D.orange, fontWeight: FontWeight.w700, fontSize: 13),
+      ),
+    ]),
+  );
+}
+
+class _TipCard extends StatelessWidget {
+  final IconData icon;
+  final Color accent;
+  final String text;
+  const _TipCard({required this.icon, required this.accent, required this.text});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: BoxDecoration(
+      color: accent.withValues(alpha: 0.06),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: accent.withValues(alpha: 0.2)),
+    ),
+    child: Row(children: [
+      Icon(icon, color: accent, size: 18),
+      const SizedBox(width: 10),
+      Expanded(child: Text(text,
+          style: const TextStyle(color: _D.textMid, fontSize: 12))),
+    ]),
+  );
+}
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  const _ErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    decoration: BoxDecoration(
+      color: Colors.orange.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+    ),
+    child: Text(message, style: const TextStyle(color: Colors.orange, fontSize: 12)),
+  );
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  const _SectionLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) => Text(
+    label,
+    style: const TextStyle(
+      color: _D.textMid,
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 2,
+    ),
+  );
+}
+
+class _Pill extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _Pill({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(5),
+    ),
+    child: Text(label,
+        style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+  );
+}
+
+// ─── Buttons ──────────────────────────────────────────────────────────────────
+class _BuyBtn extends StatefulWidget {
+  final bool canBuy;
+  final bool isFull;
+  final VoidCallback onTap;
+  const _BuyBtn({required this.canBuy, required this.isFull, required this.onTap});
+
+  @override
+  State<_BuyBtn> createState() => _BuyBtnState();
+}
+
+class _BuyBtnState extends State<_BuyBtn> {
+  bool _p = false;
+  @override
+  Widget build(BuildContext context) {
+    final label = widget.isFull ? 'Full' : 'Buy';
+    return GestureDetector(
+      onTapDown: widget.canBuy ? (_) => setState(() => _p = true) : null,
+      onTapUp: widget.canBuy ? (_) { setState(() => _p = false); widget.onTap(); } : null,
+      onTapCancel: () => setState(() => _p = false),
+      child: AnimatedScale(
+        scale: _p ? 0.93 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          decoration: BoxDecoration(
+            gradient: widget.canBuy
+                ? const LinearGradient(colors: [Color(0xFFF5A623), Color(0xFFE08800)])
+                : null,
+            color: widget.canBuy ? null : _D.cardBord,
+            borderRadius: BorderRadius.circular(9),
+            boxShadow: widget.canBuy
+                ? [BoxShadow(color: _D.gold.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 3))]
+                : null,
+          ),
+          child: Text(label,
+              style: TextStyle(
+                color: widget.canBuy ? Colors.black : _D.textLow,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              )),
+        ),
+      ),
+    );
+  }
+}
+
+class _GoldBtn extends StatefulWidget {
+  final String label;
+  final bool enabled;
+  final bool showCheck;
+  final VoidCallback onTap;
+  const _GoldBtn({required this.label, required this.enabled, required this.onTap, this.showCheck = false});
+
+  @override
+  State<_GoldBtn> createState() => _GoldBtnState();
+}
+
+class _GoldBtnState extends State<_GoldBtn> {
+  bool _p = false;
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTapDown: widget.enabled ? (_) => setState(() => _p = true) : null,
+    onTapUp: widget.enabled ? (_) { setState(() => _p = false); widget.onTap(); } : null,
+    onTapCancel: () => setState(() => _p = false),
+    child: AnimatedScale(
+      scale: _p ? 0.97 : 1.0,
+      duration: const Duration(milliseconds: 100),
+      child: Container(
+        height: 46,
+        decoration: BoxDecoration(
+          gradient: widget.enabled
+              ? const LinearGradient(colors: [Color(0xFFF5A623), Color(0xFFE08800)])
+              : null,
+          color: widget.enabled ? null : _D.cardBord,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: widget.enabled
+              ? [BoxShadow(color: _D.gold.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))]
+              : null,
+        ),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          if (widget.showCheck) ...[
+            const Icon(Icons.check_circle_rounded, color: _D.green, size: 16),
+            const SizedBox(width: 6),
+          ],
+          Text(widget.label,
+              style: TextStyle(
+                color: widget.enabled ? Colors.black : _D.textLow,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              )),
+        ]),
+      ),
+    ),
+  );
+}
+
+class _PurpleBtn extends StatefulWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _PurpleBtn({required this.label, required this.onTap});
+
+  @override
+  State<_PurpleBtn> createState() => _PurpleBtnState();
+}
+
+class _PurpleBtnState extends State<_PurpleBtn> {
+  bool _p = false;
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTapDown: (_) => setState(() => _p = true),
+    onTapUp: (_) { setState(() => _p = false); widget.onTap(); },
+    onTapCancel: () => setState(() => _p = false),
+    child: AnimatedScale(
+      scale: _p ? 0.97 : 1.0,
+      duration: const Duration(milliseconds: 100),
+      child: Container(
+        height: 46,
+        decoration: BoxDecoration(
+          color: _D.purple.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _D.purple.withValues(alpha: 0.5)),
+          boxShadow: [BoxShadow(color: _D.purple.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 4))],
+        ),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Icon(Icons.star_rounded, color: _D.purple, size: 16),
+          const SizedBox(width: 6),
+          Text(widget.label,
+              style: const TextStyle(color: _D.purple, fontWeight: FontWeight.w800, fontSize: 13)),
+        ]),
+      ),
+    ),
+  );
+}
+
+class _Blob extends StatelessWidget {
+  final Color color;
+  final double size;
+  const _Blob({required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+      child: const SizedBox.shrink(),
+    ),
+  );
+}
+
+void _toast(BuildContext context, String msg) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    content: Text(msg, style: const TextStyle(color: _D.textHi)),
+    backgroundColor: _D.card,
+    behavior: SnackBarBehavior.floating,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(10),
+      side: const BorderSide(color: _D.cardBord),
+    ),
+  ));
+}
+
+ThemeData _darkTheme() => ThemeData(
+  brightness: Brightness.dark,
+  fontFamily: AppTheme.fontFamily,
+  textTheme: AppTheme.darkTextTheme,
+  scaffoldBackgroundColor: _D.bg,
+  colorScheme: const ColorScheme.dark(primary: _D.gold, surface: _D.surface),
+);
