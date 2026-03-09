@@ -94,9 +94,16 @@ Future<void> backgroundMiningCallback() async {
     return;
   }
 
+  const primaryId = 'btc';
+  final curBtc = data.coinBalances[primaryId] ?? data.btcBalance;
+  final curLifeBtc = data.lifetimeMinedByCoin[primaryId] ?? data.lifetimeMinedBtc;
+  final newCoins = Map<String, double>.from(data.coinBalances)..[primaryId] = curBtc + earned;
+  final newLife = Map<String, double>.from(data.lifetimeMinedByCoin)..[primaryId] = curLifeBtc + earned;
   final updated = data.copyWith(
-    btcBalance: data.btcBalance + earned,
-    lifetimeMinedBtc: data.lifetimeMinedBtc + earned,
+    btcBalance: curBtc + earned,
+    lifetimeMinedBtc: curLifeBtc + earned,
+    coinBalances: newCoins,
+    lifetimeMinedByCoin: newLife,
     lastClosedAt: null,
   );
   await prefs.setString(dataKey, jsonEncode(updated.toJson()));

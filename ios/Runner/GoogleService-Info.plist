@@ -13,7 +13,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.bitcoin.crypto.mining.hashrate.rigs.pro.news.app</string>
+	<string>com.crypto.blockchain.mining.tycoon</string>
 	<key>PROJECT_ID</key>
 	<string>btcteam-a274d</string>
 	<key>STORAGE_BUCKET</key>

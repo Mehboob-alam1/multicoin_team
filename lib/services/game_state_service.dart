@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/coin.dart';
 import '../models/farm_tier.dart';
 import '../models/mining_rig.dart';
 import '../models/player_data.dart';
+import '../game_engine/mining_engine.dart';
 import 'background_mining_task.dart';
 import 'firebase_sync_service.dart';
 
@@ -39,8 +41,15 @@ class GameStateService extends ChangeNotifier {
 
   bool get isLoaded => _loaded;
   PlayerData get data => _data;
-  double get btcBalance => _data.btcBalance;
+  /// Primary currency balance (BTC). From [coinBalances] or legacy [btcBalance].
+  double get btcBalance => _data.coinBalances[Coins.primaryId] ?? _data.btcBalance;
   List<String> get ownedRigIds => List.unmodifiable(_data.ownedRigIds);
+  /// Balance for any coin (e.g. 'btc', 'eth').
+  double balance(String coinId) => _data.coinBalances[coinId] ?? 0;
+  /// Lifetime mined for any coin.
+  double lifetimeMined(String coinId) => _data.lifetimeMinedByCoin[coinId] ?? 0;
+  /// Total mining rate (coins per min) for a specific coin.
+  double totalRatePerCoin(String coinId) => _totalRatePerCoinWithSession(coinId, isSessionActive);
   bool get syncInProgress => _syncInProgress;
   String? get lastSyncError => _lastSyncError;
   List<String> get purchasedOneTimeIds => List.unmodifiable(_purchasedOneTimeIds);
@@ -51,7 +60,7 @@ class GameStateService extends ChangeNotifier {
       _data.miningSessionEndsAt != null && _data.miningSessionEndsAt!.isAfter(DateTime.now());
   Duration get sessionTimeLeft =>
       isSessionActive ? _data.miningSessionEndsAt!.difference(DateTime.now()) : Duration.zero;
-  double get lifetimeMinedBtc => _data.lifetimeMinedBtc;
+  double get lifetimeMinedBtc => _data.lifetimeMinedByCoin[Coins.primaryId] ?? _data.lifetimeMinedBtc;
   int get totalSessionsStarted => _data.totalSessionsStarted;
   List<String> get claimedMilestones => List.unmodifiable(_data.claimedMilestones);
 
@@ -64,24 +73,34 @@ class GameStateService extends ChangeNotifier {
     return _totalBtcPerMinWithSession(isSessionActive);
   }
 
-  /// Rate in BTC/min. When [sessionActive] true, applies 1.25× session bonus.
+  /// Rate in BTC/min (primary currency). When [sessionActive] true, applies 1.25× session bonus.
   double _totalBtcPerMinWithSession(bool sessionActive) {
+    return _totalRatePerCoinWithSession(Coins.primaryId, sessionActive);
+  }
+
+  /// Per-coin rate (coins/min). Uses MiningEngine with difficulty and all multipliers.
+  double _totalRatePerCoinWithSession(String coinId, bool sessionActive) {
+    final coin = Coins.byId(coinId);
+    if (coin == null) return 0;
     double sum = 0;
     for (final id in _data.ownedRigIds) {
       final rig = MiningRigs.byId(id);
-      if (rig != null) sum += rig.btcPerMin;
+      if (rig == null || !rig.supportsCoin(coinId)) continue;
+      final baseRate = rig.rateForCoin(coinId);
+      if (baseRate <= 0) continue;
+      sum += MiningEngine.effectiveRateForCoin(
+        baseRateForCoin: baseRate,
+        difficulty: coin.difficulty,
+        farmMultiplier: currentFarmTier.miningMultiplier,
+        sessionMultiplier: sessionActive ? 1.25 : 1.0,
+        premiumMultiplier: isPremiumActive ? 1.5 : 1.0,
+        boostMultiplier: isBoostActive ? 2.0 : 1.0,
+        eventMultiplier: _eventMiningMultiplier,
+        efficiencyMultiplier: _efficiencyMultiplier,
+        prestigeSpeedMultiplier: _prestigeMultiplier,
+      );
     }
-    double mult = 1.0;
-    mult *= currentFarmTier.miningMultiplier;
-    mult *= _oneTimeMiningMultiplier();
-    if (sessionActive) mult *= 1.25;
-    if (isBoostActive) mult *= 2.0;
-    if (isPremiumActive) mult *= 1.5;
-    mult *= _eventMiningMultiplier;
-    mult *= _dailyBoostMultiplier;
-    mult *= _efficiencyMultiplier;
-    mult *= _prestigeMultiplier;
-    return sum * mult;
+    return sum * _oneTimeMiningMultiplier() * _dailyBoostMultiplier;
   }
 
   void applyExternalGameplayModifiers({
@@ -164,12 +183,26 @@ class GameStateService extends ChangeNotifier {
       _fetchedRemoteThisSession = true;
       final remote = await _firebaseSync.fetchPlayerData(_userId!);
       if (remote != null && hadLocalData) {
-        final localData = _data; // _data is still local here
+        final localData = _data;
         _data = remote;
-        // Never lose mining balance: take the higher of local vs remote.
+        // Never lose mining balance: take max of local vs remote per coin.
+        final mergedCoins = Map<String, double>.from(_data.coinBalances);
+        for (final e in localData.coinBalances.entries) {
+          final cur = mergedCoins[e.key] ?? 0;
+          if (e.value > cur) mergedCoins[e.key] = e.value;
+        }
+        final mergedLife = Map<String, double>.from(_data.lifetimeMinedByCoin);
+        for (final e in localData.lifetimeMinedByCoin.entries) {
+          final cur = mergedLife[e.key] ?? 0;
+          if (e.value > cur) mergedLife[e.key] = e.value;
+        }
+        final btcBal = mergedCoins[Coins.primaryId] ?? _data.btcBalance;
+        final lifeBtc = mergedLife[Coins.primaryId] ?? _data.lifetimeMinedBtc;
         _data = _data.copyWith(
-          btcBalance: localData.btcBalance > remote.btcBalance ? localData.btcBalance : remote.btcBalance,
-          lifetimeMinedBtc: localData.lifetimeMinedBtc > remote.lifetimeMinedBtc ? localData.lifetimeMinedBtc : remote.lifetimeMinedBtc,
+          coinBalances: mergedCoins,
+          lifetimeMinedByCoin: mergedLife,
+          btcBalance: btcBal,
+          lifetimeMinedBtc: lifeBtc,
         );
       }
       final oneTime = await _firebaseSync.getOneTimePurchases(_userId!);
@@ -222,10 +255,7 @@ class GameStateService extends ChangeNotifier {
         earned = rateWithout * minutesAway;
       }
       if (earned > 0) {
-        _data = _data.copyWith(
-          btcBalance: _data.btcBalance + earned,
-          lifetimeMinedBtc: _data.lifetimeMinedBtc + earned,
-        );
+        _data = _addMinedToCoin(_data, Coins.primaryId, earned);
       }
       await prefs.remove(_foregroundSnapshotKey);
     } catch (_) {}
@@ -245,11 +275,8 @@ class GameStateService extends ChangeNotifier {
     final baseRate = totalBtcPerMin;
     final earned = baseRate * minutes;
     if (earned > 0) {
-      _data = _data.copyWith(
-        btcBalance: _data.btcBalance + earned,
-        lifetimeMinedBtc: _data.lifetimeMinedBtc + earned,
-        lastClosedAt: null,
-      );
+      _data = _addMinedToCoin(_data, Coins.primaryId, earned);
+      _data = _data.copyWith(lastClosedAt: null);
     }
   }
 
@@ -283,11 +310,8 @@ class GameStateService extends ChangeNotifier {
     }
 
     if (earned > 0) {
-      _data = _data.copyWith(
-        btcBalance: _data.btcBalance + earned,
-        lifetimeMinedBtc: _data.lifetimeMinedBtc + earned,
-        lastClosedAt: null,
-      );
+      _data = _addMinedToCoin(_data, Coins.primaryId, earned);
+      _data = _data.copyWith(lastClosedAt: null);
       await _persist(forceRemote: false, markDirty: true);
       notifyListeners();
     } else {
@@ -332,7 +356,7 @@ class GameStateService extends ChangeNotifier {
         await _firebaseSync.updateLeaderboard(
           _userId!,
           displayName: _displayName,
-          btcBalance: _data.btcBalance,
+          btcBalance: btcBalance,
           totalBtcPerMin: totalBtcPerMin,
         );
         _lastRemoteSyncAt = now;
@@ -395,37 +419,65 @@ class GameStateService extends ChangeNotifier {
     await prefs.setString(_foregroundSnapshotKey, jsonEncode(map));
   }
 
-  double rigCost(MiningRig rig) => rig.costBtc * (1 - _rigDiscount.clamp(0.0, 0.9));
+  /// Cost for next [rig] (exponential scaling by how many already owned).
+  double rigCost(MiningRig rig) {
+    final count = _data.ownedRigIds.where((id) => id == rig.id).length;
+    return MiningRigs.costForCount(rig, count) * (1 - _rigDiscount.clamp(0.0, 0.9));
+  }
 
   Future<void> buyRig(MiningRig rig) async {
     final cost = rigCost(rig);
-    if (_data.btcBalance < cost) return;
+    final primary = btcBalance;
+    if (primary < cost) return;
     if (!canBuyMoreRigs) return;
-    _data = _data.copyWith(
-      btcBalance: _data.btcBalance - cost,
-      ownedRigIds: [..._data.ownedRigIds, rig.id],
-    );
+    _data = _updatePrimaryBalance(_data, -cost);
+    _data = _data.copyWith(ownedRigIds: [..._data.ownedRigIds, rig.id]);
     await _persist();
     notifyListeners();
   }
 
-  bool canAfford(MiningRig rig) => _data.btcBalance >= rigCost(rig);
+  bool canAfford(MiningRig rig) => btcBalance >= rigCost(rig);
 
-  bool canSpendBtc(double amount) => _data.btcBalance >= amount;
+  bool canSpendBtc(double amount) => btcBalance >= amount;
+
+  /// Updates primary (BTC) balance in [data]. Keeps [coinBalances] and [btcBalance] in sync.
+  PlayerData _updatePrimaryBalance(PlayerData data, double delta) {
+    final cur = data.coinBalances[Coins.primaryId] ?? data.btcBalance;
+    final next = (cur + delta).clamp(0.0, double.infinity);
+    final newCoins = Map<String, double>.from(data.coinBalances)..[Coins.primaryId] = next;
+    return data.copyWith(btcBalance: next, coinBalances: newCoins);
+  }
+
+  /// Adds [amount] of [coinId] to balance and lifetime mined; syncs primary if btc.
+  PlayerData _addMinedToCoin(PlayerData data, String coinId, double amount) {
+    final newCoins = Map<String, double>.from(data.coinBalances);
+    newCoins[coinId] = (newCoins[coinId] ?? 0) + amount;
+    final newLife = Map<String, double>.from(data.lifetimeMinedByCoin);
+    newLife[coinId] = (newLife[coinId] ?? 0) + amount;
+    double newBtc = data.btcBalance;
+    double newLifeBtc = data.lifetimeMinedBtc;
+    if (coinId == Coins.primaryId) {
+      newBtc = newCoins[coinId]!;
+      newLifeBtc = newLife[coinId]!;
+    }
+    return data.copyWith(
+      coinBalances: newCoins,
+      lifetimeMinedByCoin: newLife,
+      btcBalance: newBtc,
+      lifetimeMinedBtc: newLifeBtc,
+    );
+  }
 
   Future<void> deductBtc(double amount) async {
-    if (_data.btcBalance < amount) return;
-    _data = _data.copyWith(btcBalance: _data.btcBalance - amount);
+    if (btcBalance < amount) return;
+    _data = _updatePrimaryBalance(_data, -amount);
     await _persist();
     notifyListeners();
   }
 
   Future<void> grantDirectBtc(double amount) async {
     if (amount <= 0) return;
-    _data = _data.copyWith(
-      btcBalance: _data.btcBalance + amount,
-      lifetimeMinedBtc: _data.lifetimeMinedBtc + amount,
-    );
+    _data = _addMinedToCoin(_data, Coins.primaryId, amount);
     await _persist();
     notifyListeners();
   }
@@ -461,12 +513,10 @@ class GameStateService extends ChangeNotifier {
     if (day < 1 || day > 7) return;
     final btc = dailyRewardBtc(day);
     final rigId = dailyRewardRigId(day);
-    double newBtc = _data.btcBalance;
-    if (btc != null && btc > 0) newBtc += btc;
+    if (btc != null && btc > 0) _data = _addMinedToCoin(_data, Coins.primaryId, btc);
     List<String> newRigs = List.from(_data.ownedRigIds);
     if (rigId != null) newRigs.add(rigId);
     _data = _data.copyWith(
-      btcBalance: newBtc,
       ownedRigIds: newRigs,
       lastDailyRewardDay: currentDayForDaily,
       dailyStreakCount: day,
@@ -490,7 +540,7 @@ class GameStateService extends ChangeNotifier {
       case 'sessions_20':
         return _data.totalSessionsStarted >= 20;
       case 'lifetime_0005':
-        return _data.lifetimeMinedBtc >= 0.0005;
+        return lifetimeMinedBtc >= 0.0005;
       default:
         return false;
     }
@@ -515,8 +565,8 @@ class GameStateService extends ChangeNotifier {
     }
     final newClaimed = [..._data.claimedMilestones, id];
     final newRigs = [..._data.ownedRigIds, if (rewardRig != null) rewardRig];
+    if (rewardBtc > 0) _data = _addMinedToCoin(_data, Coins.primaryId, rewardBtc);
     _data = _data.copyWith(
-      btcBalance: _data.btcBalance + rewardBtc,
       ownedRigIds: newRigs,
       claimedMilestones: newClaimed,
     );
@@ -537,11 +587,10 @@ class GameStateService extends ChangeNotifier {
       if (_purchasedOneTimeIds.contains(productId)) return;
       _purchasedOneTimeIds = [..._purchasedOneTimeIds, productId];
     }
-    double newBtc = _data.btcBalance;
-    if (btcAmount != null && btcAmount > 0) newBtc += btcAmount;
+    if (btcAmount != null && btcAmount > 0) _data = _addMinedToCoin(_data, Coins.primaryId, btcAmount);
     List<String> newRigs = List.from(_data.ownedRigIds);
     if (rigId != null) newRigs.add(rigId);
-    _data = _data.copyWith(btcBalance: newBtc, ownedRigIds: newRigs);
+    _data = _data.copyWith(ownedRigIds: newRigs);
     await _persist();
     notifyListeners();
   }
@@ -572,11 +621,9 @@ class GameStateService extends ChangeNotifier {
   Future<void> upgradeFarm() async {
     final next = nextFarmTier;
     if (next == null) return;
-    if (_data.btcBalance < next.upgradeCostBtc) return;
-    _data = _data.copyWith(
-      btcBalance: _data.btcBalance - next.upgradeCostBtc,
-      farmLevel: next.level,
-    );
+    if (btcBalance < next.upgradeCostBtc) return;
+    _data = _updatePrimaryBalance(_data, -next.upgradeCostBtc);
+    _data = _data.copyWith(farmLevel: next.level);
     await _persist();
     notifyListeners();
   }
@@ -620,10 +667,10 @@ class GameStateService extends ChangeNotifier {
       default:
         return;
     }
-    double newBtc = _data.btcBalance + btc;
+    if (btc > 0) _data = _addMinedToCoin(_data, Coins.primaryId, btc);
     List<String> newRigs = List.from(_data.ownedRigIds);
     if (rigId != null) newRigs.add(rigId);
-    _data = _data.copyWith(btcBalance: newBtc, ownedRigIds: newRigs);
+    _data = _data.copyWith(ownedRigIds: newRigs);
     if (boostDuration != null && _userId != null) {
       final expiry = DateTime.now().add(boostDuration);
       await _firebaseSync.recordBoostExpiry(_userId!, expiry);
@@ -645,11 +692,11 @@ class GameStateService extends ChangeNotifier {
     if (_lastTick != null) {
       final diff = now.difference(_lastTick!);
       final mins = diff.inMilliseconds / 60000;
-      final earned = totalBtcPerMin * mins;
-      _data = _data.copyWith(
-        btcBalance: _data.btcBalance + earned,
-        lifetimeMinedBtc: _data.lifetimeMinedBtc + earned,
-      );
+      for (final coin in Coins.all) {
+        final rate = _totalRatePerCoinWithSession(coin.id, isSessionActive);
+        final earned = rate * mins;
+        if (earned > 0) _data = _addMinedToCoin(_data, coin.id, earned);
+      }
     }
     _lastTick = now;
     notifyListeners();

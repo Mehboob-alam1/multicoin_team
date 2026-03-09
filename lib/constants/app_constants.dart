@@ -3,11 +3,11 @@ class AppConstants {
   AppConstants._();
 
   /// Android package name / iOS bundle ID.
-  static const String packageName = 'com.bitcoin.crypto.mining.hashrate.rigs.pro.news.app';
+  static const String packageName = 'com.crypto.blockchain.mining.tycoon';
 
   /// Play Store link (Android). Use for share text and fallback when in-app review is not available.
   static const String playStoreUrl =
-      'https://play.google.com/store/apps/details?id=com.bitcoin.crypto.mining.hashrate.rigs.pro.news.app';
+      'https://play.google.com/store/apps/details?id=com.crypto.blockchain.mining.tycoon';
 
   /// App Store link (iOS). Replace with your actual App Store ID when published.
   /// Format: https://apps.apple.com/app/idYOUR_APP_ID

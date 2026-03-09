@@ -1,4 +1,4 @@
-package com.bitcoin.crypto.mining.hashrate.rigs.pro.news.app
+package com.crypto.blockchain.mining.tycoon
 
 import io.flutter.embedding.android.FlutterActivity
 

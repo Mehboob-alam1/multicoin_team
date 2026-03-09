@@ -56,7 +56,7 @@ class DefaultFirebaseOptions {
     databaseURL: 'https://btcteam-a274d-default-rtdb.firebaseio.com',
     storageBucket: 'btcteam-a274d.firebasestorage.app',
     iosClientId: '1079258737071-qmmd7oacpij6c8km1pbdga6t4h8h7teq.apps.googleusercontent.com',
-    iosBundleId: 'com.bitcoin.crypto.mining.hashrate.rigs.pro.news.app',
+    iosBundleId: 'com.crypto.blockchain.mining.tycoon',
   );
 
 }

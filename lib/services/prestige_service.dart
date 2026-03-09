@@ -11,7 +11,14 @@ class PrestigeService extends ChangeNotifier {
 
   int get level => _level;
   int get tokens => _tokens;
-  double get permanentMultiplier => 1.0 + (level * 0.05);
+  /// Combined mining multiplier (speed × efficiency) for backward compatibility.
+  double get permanentMultiplier => miningSpeedMultiplier * efficiencyMultiplier;
+  /// +20% mining speed per prestige level.
+  double get miningSpeedMultiplier => 1.0 + (level * 0.20);
+  /// +15% efficiency per prestige level.
+  double get efficiencyMultiplier => 1.0 + (level * 0.15);
+  /// +10% reward bonuses (daily, milestones) per prestige level.
+  double get rewardBonusMultiplier => 1.0 + (level * 0.10);
   static const double minBtcToPrestige = 0.001;
   static const int tokensPerPrestige = 1;
 

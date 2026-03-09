@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.bitcoin.crypto.mining.hashrate.rigs.pro.news.app"
+    namespace = "com.crypto.blockchain.mining.tycoon"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.bitcoin.crypto.mining.hashrate.rigs.pro.news.app"
+        applicationId = "com.crypto.blockchain.mining.tycoon"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

@@ -16,7 +16,7 @@ Idle simulator: start with a small rig and grow into a mega mining farm. Mining 
 ## Firebase setup
 
 1. Create a project at [Firebase Console](https://console.firebase.google.com).
-2. Add Android and iOS apps (bundle ID: `com.bitcoin.crypto.mining.hashrate.rigs.pro.news.app`).
+2. Add Android and iOS apps (bundle ID: `com.crypto.blockchain.mining.tycoon`).
 3. Enable **Authentication** → Sign-in method: **Anonymous** and **Google**.
 4. Enable **Realtime Database** and set rules (or deploy `database.rules.json`):
    ```bash
