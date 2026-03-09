@@ -7,6 +7,7 @@ import '../services/ad_pacing_service.dart';
 import '../services/ad_remote_config_service.dart';
 import '../services/game_state_service.dart';
 import '../services/lucky_spin_service.dart';
+import '../services/mini_game_service.dart';
 import '../services/smart_ad_manager.dart';
 import '../widgets/minimizable_native_ad.dart';
 import '../theme/app_theme.dart';
@@ -143,6 +144,12 @@ class RewardsScreen extends StatelessWidget {
                         _SectionLabel(label: 'LUCKY SPIN'),
                         const SizedBox(height: 10),
                         _LuckySpinCard(spin: spin),
+                        const SizedBox(height: 20),
+
+                        // ── Mini-game (tap challenge) ──────────────────
+                        _SectionLabel(label: 'TAP CHALLENGE'),
+                        const SizedBox(height: 10),
+                        _MiniGameCard(),
                         const SizedBox(height: 20),
 
                         // ── Ad rewards ───────────────────────────────
@@ -422,6 +429,58 @@ class _DailyCycleRow extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+// ─── Mini-game (tap challenge) card ───────────────────────────────────────────
+class _MiniGameCard extends StatelessWidget {
+  const _MiniGameCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final mini = context.watch<MiniGameService>();
+    return Container(
+      decoration: BoxDecoration(
+        color: _D.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _D.gold.withValues(alpha: 0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: _D.gold.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.touch_app_rounded, color: _D.gold, size: 26),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Tap challenge',
+                  style: TextStyle(color: _D.textHi, fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Tap ${MiniGameService.tapTarget}x in ${MiniGameService.tapTimeSec}s · +${MiniGameService.rewardBtc.toStringAsFixed(5)} BTC · ${mini.playsLeft} plays left',
+                  style: const TextStyle(color: _D.textMid, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: mini.canPlay ? () => Navigator.pushNamed(context, '/mini-game') : null,
+            child: const Text('Play'),
+          ),
+        ]),
       ),
     );
   }

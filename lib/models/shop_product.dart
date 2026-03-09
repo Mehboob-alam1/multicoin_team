@@ -65,8 +65,7 @@ class ShopProducts {
       id: 'boost_2x_1h',
       name: '2x Boost (1 hour)',
       description: 'Double mining rate for 1 hour',
-      price: '0.00005 BTC',
-      isBtcPrice: true,
+      price: '\$0.99',
       icon: '⚡',
     ),
     OneTimeProduct(
@@ -77,6 +76,13 @@ class ShopProducts {
       btcAmount: 0.0005,
       rigId: 'mining_rack',
       icon: '💎',
+    ),
+    OneTimeProduct(
+      id: 'season_pass',
+      name: 'Season Pass',
+      description: 'Unlock premium season rewards',
+      price: '\$2.99',
+      icon: '🏆',
     ),
   ];
 

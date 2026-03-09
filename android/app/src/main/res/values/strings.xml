@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Meta (Facebook) SDK: set your App ID and Client Token here, or use the same values from Firebase Remote Config (facebook_app_id, facebook_client_token). -->
+    <string name="facebook_app_id" translatable="false"></string>
+    <string name="facebook_client_token" translatable="false"></string>
+</resources>

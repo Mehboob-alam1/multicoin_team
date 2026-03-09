@@ -131,7 +131,7 @@ class _ShopScreenState extends State<ShopScreen>
                       controller: _tabController,
                       children: [
                         _RigsTab(game: game, events: events),
-                        _OneTimeTab(game: game, iap: iap),
+                        _OneTimeTab(game: game, iap: iap, adCfg: adCfg),
                         _PremiumTab(game: game, iap: iap),
                       ],
                     ),
@@ -464,7 +464,8 @@ class _RigShopCard extends StatelessWidget {
 class _OneTimeTab extends StatelessWidget {
   final GameStateService game;
   final IapService iap;
-  const _OneTimeTab({required this.game, required this.iap});
+  final AdRemoteConfigService adCfg;
+  const _OneTimeTab({required this.game, required this.iap, required this.adCfg});
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -484,6 +485,28 @@ class _OneTimeTab extends StatelessWidget {
       const SizedBox(height: 14),
 
       _SectionLabel(label: 'PACKS'),
+      if (adCfg.first24hBundleDiscountPercent > 0) ...[
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: _D.gold.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _D.gold.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.local_offer_rounded, color: _D.gold, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                'Limited time: Starter pack ${adCfg.first24hBundleDiscountPercent}% off',
+                style: const TextStyle(color: _D.gold, fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+      ],
       const SizedBox(height: 10),
 
       ...ShopProducts.oneTime.map((product) {

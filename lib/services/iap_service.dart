@@ -5,7 +5,7 @@ import '../models/shop_product.dart';
 
 /// Product IDs must match Google Play Console & App Store Connect.
 class IapService extends ChangeNotifier {
-  static const oneTimeIds = {'starter_pack', 'satoshi_pack', 'mega_pack', 'boost_2x_1h'};
+  static const oneTimeIds = {'starter_pack', 'satoshi_pack', 'mega_pack', 'boost_2x_1h', 'season_pass'};
   static const subscriptionIds = {'premium_monthly', 'premium_yearly'};
   static const allIds = {...oneTimeIds, ...subscriptionIds};
 

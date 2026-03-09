@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'firebase_sync_service.dart';
 
 class GlobalLeaderboardEntry {
   final String uid;
@@ -35,8 +35,12 @@ class GlobalLeaderboardEntry {
 }
 
 class LeaderboardService extends ChangeNotifier {
-  final _firestore = FirebaseFirestore.instance;
-  static const _cacheKey = 'firestore_leaderboard_cache';
+  LeaderboardService(this._firebaseSync);
+
+  final FirebaseSyncService _firebaseSync;
+  static const _cacheKey = 'leaderboard_cache';
+  static const _cacheTimeKey = 'leaderboard_cache_time_ms';
+  static const _cacheMaxAge = Duration(minutes: 5);
 
   List<GlobalLeaderboardEntry> _cached = [];
   List<GlobalLeaderboardEntry> get cached => List.unmodifiable(_cached);
@@ -50,36 +54,34 @@ class LeaderboardService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateUser({
-    required String uid,
-    required String displayName,
-    required double totalMined,
-    required double hashRate,
-    required int farmSize,
-  }) async {
-    await _firestore.collection('leaderboard').doc(uid).set({
-      'displayName': displayName,
-      'totalMined': totalMined,
-      'hashRate': hashRate,
-      'farmSize': farmSize,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-  }
-
+  /// Fetches top entries from RTDB only. Uses cache if younger than [_cacheMaxAge] to reduce Firebase usage.
   Future<void> fetchTop() async {
-    final snap = await _firestore.collection('leaderboard').limit(100).get();
-    final list = snap.docs
-        .map((d) => GlobalLeaderboardEntry(
-              uid: d.id,
-              name: (d.data()['displayName'] ?? 'Miner').toString(),
-              totalMined: (d.data()['totalMined'] as num?)?.toDouble() ?? 0,
-              hashRate: (d.data()['hashRate'] as num?)?.toDouble() ?? 0,
-              farmSize: (d.data()['farmSize'] as num?)?.toInt() ?? 0,
+    final prefs = await SharedPreferences.getInstance();
+    final cacheTimeMs = prefs.getInt(_cacheTimeKey);
+    if (cacheTimeMs != null &&
+        DateTime.now().millisecondsSinceEpoch - cacheTimeMs < _cacheMaxAge.inMilliseconds) {
+      final raw = prefs.getString(_cacheKey);
+      if (raw != null) {
+        try {
+          final list = (jsonDecode(raw) as List).cast<Map>();
+          _cached = list.map((e) => GlobalLeaderboardEntry.fromJson(Map<String, dynamic>.from(e))).toList();
+          notifyListeners();
+          return;
+        } catch (_) {}
+      }
+    }
+    final rtdbList = await _firebaseSync.getLeaderboard(limit: 100);
+    _cached = rtdbList
+        .map((e) => GlobalLeaderboardEntry(
+              uid: e.uid,
+              name: e.displayName,
+              totalMined: e.btcBalance,
+              hashRate: e.totalBtcPerMin,
+              farmSize: 0,
             ))
         .toList();
-    _cached = List.from(list);
-    final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_cacheKey, jsonEncode(_cached.map((e) => e.toJson()).toList()));
+    await prefs.setInt(_cacheTimeKey, DateTime.now().millisecondsSinceEpoch);
     notifyListeners();
   }
 }

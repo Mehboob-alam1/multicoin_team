@@ -77,6 +77,36 @@
         "value": "/21775744923/example/adaptive-banner"
       },
       "valueType": "STRING"
+    },
+    "facebook_app_id": {
+      "defaultValue": {
+        "value": ""
+      },
+      "valueType": "STRING"
+    },
+    "facebook_client_token": {
+      "defaultValue": {
+        "value": ""
+      },
+      "valueType": "STRING"
+    },
+    "event_mining_multiplier": {
+      "defaultValue": {
+        "value": "1.0"
+      },
+      "valueType": "STRING"
+    },
+    "event_rig_discount": {
+      "defaultValue": {
+        "value": "0.0"
+      },
+      "valueType": "STRING"
+    },
+    "first_24h_bundle_discount_percent": {
+      "defaultValue": {
+        "value": "0"
+      },
+      "valueType": "STRING"
     }
   }
 }

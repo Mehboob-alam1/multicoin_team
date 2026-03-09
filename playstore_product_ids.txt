@@ -1,0 +1,28 @@
+PLAY STORE PRODUCT IDS – Bitcoin Mining
+=============================================
+
+Add these in Google Play Console (Monetize → Products → In-app products / Subscriptions).
+Use the Product ID exactly as shown. Names and descriptions can match or be adapted for the store listing.
+
+
+ONE-TIME PRODUCTS (In-app products)
+-----------------------------------
+Name                  Description                          Product ID      Price
+Starter Pack          Small BTC + 1 GPU rig                starter_pack   $1.99
+Satoshi Pack          ~2 days mining worth                 satoshi_pack   $4.99
+Mega Pack             Larger BTC + Mining rack             mega_pack       $9.99
+2x Boost (1 hour)     Double mining rate for 1 hour        boost_2x_1h     $0.99
+Season Pass           Unlock premium season rewards         season_pass     $2.99
+
+
+SUBSCRIPTIONS
+-------------
+Name                  Description                          Product ID        Price
+Premium Monthly       Exclusive rigs, 1.5x mining, no ads  premium_monthly   $4.99/mo
+Premium Yearly        Best value — save 50%                premium_yearly    $29.99/yr
+
+
+COPY-PASTE PRODUCT IDS
+-----------------------
+In-app products:  starter_pack, satoshi_pack, mega_pack, boost_2x_1h, season_pass
+Subscriptions:    premium_monthly, premium_yearly

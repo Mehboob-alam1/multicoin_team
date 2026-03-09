@@ -27,6 +27,19 @@ class EventService extends ChangeNotifier {
     notifyListeners();
   }
 
+  static const _lastRefreshKey = 'weekly_events_last_refresh_ms';
+  static const _cacheMaxAge = Duration(hours: 6);
+
+  /// Refresh from Firestore only if cache is older than [_cacheMaxAge] to reduce Firebase reads.
+  Future<void> refreshFromFirebaseIfNeeded() async {
+    final lastMs = LocalFeatureStore.get(_lastRefreshKey);
+    final last = lastMs is int ? lastMs as int? : null;
+    if (last != null && DateTime.now().millisecondsSinceEpoch - last < _cacheMaxAge.inMilliseconds) {
+      return;
+    }
+    await refreshFromFirebase();
+  }
+
   Future<void> refreshFromFirebase() async {
     _loading = true;
     notifyListeners();
@@ -42,6 +55,7 @@ class EventService extends ChangeNotifier {
           'miningMultiplier': _miningMultiplier,
           'rigDiscount': _rigDiscount,
         });
+        await LocalFeatureStore.set(_lastRefreshKey, DateTime.now().millisecondsSinceEpoch);
       }
     } catch (_) {}
     _loading = false;

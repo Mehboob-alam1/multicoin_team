@@ -724,7 +724,7 @@ class _ShareButton extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         final code = referral.myCode ?? '';
-        final text = 'Join me on BTC Mining Simulator! Use my code $code to get started. '
+        final text = 'Join me on Bitcoin Mining! Use my code $code to get started. '
             'Download the app and enter the code in Profile → Invite friends. '
             '${AppConstants.playStoreUrl}';
         Share.share(text);
@@ -1039,7 +1039,7 @@ class _LegalSupportSection extends StatelessWidget {
             label: 'Share App',
             onTap: () {
               Share.share(
-                'Check out BTC Mining Simulator – mine BTC, build your farm, and climb the leaderboard! '
+                'Check out Bitcoin Mining – mine BTC, build your farm, and climb the leaderboard! '
                 '${AppConstants.playStoreUrl}',
               );
             },

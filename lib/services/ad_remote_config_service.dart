@@ -19,6 +19,11 @@ class AdRemoteConfigService extends ChangeNotifier {
   static const _admanagerAppOpen = 'admanager_app_open';
   static const _bannerAdUnit = 'banner_ad_unit';
   static const _bannerAdmanagerUnit = 'banner_admanager_unit';
+  static const _facebookAppId = 'facebook_app_id';
+  static const _facebookClientToken = 'facebook_client_token';
+  static const _eventMiningMultiplier = 'event_mining_multiplier';
+  static const _eventRigDiscount = 'event_rig_discount';
+  static const _first24hBundleDiscountPercent = 'first_24h_bundle_discount_percent';
 
   final FirebaseRemoteConfig _remoteConfig = FirebaseRemoteConfig.instance;
   bool _loaded = false;
@@ -80,6 +85,27 @@ class AdRemoteConfigService extends ChangeNotifier {
   String get bannerAdmobId => _getString(_bannerAdUnit);
   String get bannerAdxId => _getString(_bannerAdmanagerUnit);
 
+  /// Facebook App ID for Meta (Facebook) analytics / marketing. Set in Remote Config.
+  String get facebookAppId => _getString(_facebookAppId);
+  /// Facebook Client Token for Meta SDK. Set in Remote Config.
+  String get facebookClientToken => _getString(_facebookClientToken);
+  /// True when both Facebook credentials are set (Meta events will be sent).
+  bool get hasMetaCredentials =>
+      facebookAppId.trim().isNotEmpty && facebookClientToken.trim().isNotEmpty;
+
+  double get eventMiningMultiplier {
+    final s = _getString(_eventMiningMultiplier);
+    return double.tryParse(s) ?? 1.0;
+  }
+  double get eventRigDiscount {
+    final s = _getString(_eventRigDiscount);
+    return double.tryParse(s) ?? 0.0;
+  }
+  int get first24hBundleDiscountPercent {
+    final s = _getString(_first24hBundleDiscountPercent);
+    return int.tryParse(s) ?? 0;
+  }
+
   static Map<String, Object> get defaultParameters => {
         _adsEnabled: true,
         _useCustomTab: true,
@@ -94,6 +120,11 @@ class AdRemoteConfigService extends ChangeNotifier {
         _admanagerAppOpen: 'ca-app-pub-3940256099942544/9257395921',
         _bannerAdUnit: 'ca-app-pub-3940256099942544/6300978111',
         _bannerAdmanagerUnit: '/21775744923/example/adaptive-banner',
+        _facebookAppId: '',
+        _facebookClientToken: '',
+        _eventMiningMultiplier: '1.0',
+        _eventRigDiscount: '0.0',
+        _first24hBundleDiscountPercent: '0',
       };
 
   Future<void> load() async {
@@ -101,7 +132,7 @@ class AdRemoteConfigService extends ChangeNotifier {
       await _remoteConfig.setDefaults(defaultParameters);
       await _remoteConfig.setConfigSettings(RemoteConfigSettings(
         fetchTimeout: const Duration(seconds: 15),
-        minimumFetchInterval: kDebugMode ? Duration.zero : const Duration(hours: 1),
+        minimumFetchInterval: kDebugMode ? Duration.zero : const Duration(hours: 6),
       ));
       await _remoteConfig.fetchAndActivate();
     } catch (e) {

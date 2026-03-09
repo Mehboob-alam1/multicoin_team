@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'theme/app_theme.dart';
 import 'services/ad_remote_config_service.dart';
+import 'services/analytics_service.dart';
 import 'services/ad_pacing_service.dart';
 import 'services/achievement_service.dart';
 import 'services/auth_service.dart';
@@ -23,11 +24,18 @@ import 'services/smart_ad_manager.dart';
 import 'services/rate_app_service.dart';
 import 'services/weekly_challenge_service.dart';
 import 'services/withdrawal_service.dart';
+import 'services/goals_service.dart';
+import 'services/comeback_bonus_service.dart';
+import 'services/prestige_service.dart';
+import 'services/mini_game_service.dart';
+import 'services/season_service.dart';
 import 'screens/login_screen.dart';
+import 'screens/premium_offer_screen.dart';
 import 'screens/home_shell.dart';
 import 'screens/profile_screen.dart';
 import 'screens/lucky_spin_screen.dart';
 import 'screens/news_screen.dart';
+import 'screens/mini_game_screen.dart';
 
 class BtcSimApp extends StatelessWidget {
   const BtcSimApp({super.key});
@@ -41,6 +49,7 @@ class BtcSimApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => BtcPriceService()),
         ChangeNotifierProvider(create: (_) => IapService()),
         ChangeNotifierProvider(create: (_) => AdRemoteConfigService()),
+        ChangeNotifierProvider(create: (ctx) => AnalyticsService(ctx.read<AdRemoteConfigService>())),
         ChangeNotifierProvider(create: (ctx) => SmartAdManager(ctx.read<AdRemoteConfigService>())),
         ChangeNotifierProvider(create: (_) => AdPacingService()),
         ChangeNotifierProvider(create: (_) => ProgressionService()),
@@ -52,24 +61,32 @@ class BtcSimApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => EventService()),
         ChangeNotifierProvider(create: (_) => RandomDropService()),
         ChangeNotifierProvider(create: (_) => EnergyCoolingService()),
-        ChangeNotifierProvider(create: (_) => LeaderboardService()),
+        ChangeNotifierProvider(create: (ctx) => LeaderboardService(ctx.read<FirebaseSyncService>())),
         ChangeNotifierProvider(create: (_) => ReferralService()),
         ChangeNotifierProvider(create: (_) => WeeklyChallengeService()),
         ChangeNotifierProvider(create: (_) => WithdrawalService()),
         ChangeNotifierProvider(create: (_) => RateAppService()),
+        ChangeNotifierProvider(create: (_) => GoalsService()),
+        ChangeNotifierProvider(create: (_) => ComebackBonusService()),
+        ChangeNotifierProvider(create: (_) => PrestigeService()),
+        ChangeNotifierProvider(create: (_) => MiniGameService()),
+        ChangeNotifierProvider(create: (_) => SeasonService()),
         ChangeNotifierProvider(create: (ctx) => GameStateService(ctx.read<FirebaseSyncService>())),
       ],
       child: MaterialApp(
-        title: 'BTC Mining Simulator',
+        title: 'Bitcoin Mining',
         theme: AppTheme.dark,
+        debugShowCheckedModeBanner: false,
         initialRoute: '/',
         routes: {
           '/': _authWrapper,
           '/login': (ctx) => const LoginScreen(),
+          '/premium-offer': (ctx) => const PremiumOfferScreen(),
           '/home': (ctx) => const HomeShell(),
           '/profile': (ctx) => const ProfileScreen(),
           '/lucky-spin': (ctx) => const LuckySpinScreen(),
           '/news': (ctx) => const NewsScreen(),
+          '/mini-game': (ctx) => const MiniGameScreen(),
         },
       ),
     );

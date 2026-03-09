@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/ad_remote_config_service.dart';
 import '../services/game_state_service.dart';
+import '../services/analytics_service.dart';
 import '../services/lucky_spin_service.dart';
 import '../services/notification_service.dart';
 import '../services/smart_ad_manager.dart';
@@ -123,6 +124,8 @@ class _LuckySpinScreenState extends State<LuckySpinScreen>
 
     final result = await spin.spin();
     if (result == null) return;
+
+    if (mounted) context.read<AnalyticsService>().logLuckySpin(rewardType: result.type);
 
     _result = result;
     setState(() => _spinning = true);

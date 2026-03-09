@@ -8,14 +8,20 @@ import 'package:provider/provider.dart';
 import '../models/shop_product.dart';
 import '../services/ad_pacing_service.dart';
 import '../services/ad_remote_config_service.dart';
+import '../services/analytics_service.dart';
 import '../services/achievement_service.dart';
 import '../services/auth_service.dart';
+import '../services/comeback_bonus_service.dart';
 import '../services/daily_boost_service.dart';
 import '../services/energy_cooling_service.dart';
 import '../services/event_service.dart';
 import '../services/game_state_service.dart';
+import '../services/goals_service.dart';
+import '../services/prestige_service.dart';
+import '../services/season_service.dart';
 import '../services/iap_service.dart';
 import '../services/leaderboard_service.dart';
+import '../services/mini_game_service.dart';
 import '../services/login_streak_service.dart';
 import '../services/lucky_spin_service.dart';
 import '../services/notification_service.dart';
@@ -106,12 +112,12 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _index = 0;
+  int _snapshotTicks = 0;
+  int _localSaveTicks = 0;
+  double? _lastBalanceForGoals;
+  bool _dailyBoostDialogShownThisSession = false;
   Timer? _timer;
   Timer? _syncTimer;
-  DateTime? _lastLeaderboardPushAt;
-  double _lastLeaderboardMined = 0;
-  double _lastLeaderboardHash  = 0;
-
   @override
   void initState() {
     super.initState();
@@ -128,12 +134,36 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     final user = auth.currentUser;
     game.setUserId(user?.uid);
     game.setDisplayName(user?.displayName ?? (user?.email ?? 'Miner'));
-    game.load();
+    game.load().then((_) async {
+      if (!mounted) return;
+      await context.read<GameStateService>().applyIdleEarningsOnResume();
+      // Leaderboard is updated via GameStateService.syncToCloud() (RTDB only) to reduce Firebase usage.
+    });
+    context.read<GoalsService>().load();
+    context.read<ComebackBonusService>().load().then((_) async {
+      if (!mounted) return;
+      await context.read<ComebackBonusService>().recordOpen();
+    });
+    context.read<PrestigeService>().load();
+    context.read<MiniGameService>().load();
+    context.read<SeasonService>().load();
     context.read<ProgressionService>().load();
-    context.read<DailyBoostService>().load();
+    context.read<DailyBoostService>().load().then((_) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_dailyBoostDialogShownThisSession) return;
+        final daily = context.read<DailyBoostService>();
+        if (daily.canClaim && !daily.hasShownDialogForCurrentDay) {
+          _dailyBoostDialogShownThisSession = true;
+          daily.recordDialogShownForCurrentDay();
+          _showDailyBoostDialog(daily);
+        }
+      });
+    });
     context.read<LuckySpinService>().load();
     context.read<AchievementService>().load();
-    context.read<EventService>().load().then((_) => context.read<EventService>().refreshFromFirebase());
+    context.read<EventService>().load().then((_) => context.read<EventService>().refreshFromFirebaseIfNeeded());
     context.read<RandomDropService>().load();
     context.read<EnergyCoolingService>().load();
     context.read<LeaderboardService>().loadCache();
@@ -144,8 +174,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       await context.read<LoginStreakService>().recordLogin();
     });
     context.read<AdPacingService>().load();
-    context.read<AdRemoteConfigService>().load().then((_) {
+    context.read<AdRemoteConfigService>().load().then((_) async {
       if (!mounted) return;
+      await context.read<AnalyticsService>().initFromRemoteConfig();
+      if (!mounted) return;
+      context.read<AnalyticsService>().logScreenView('home');
+      final uid = context.read<AuthService>().currentUser?.uid;
+      if (uid != null) context.read<AnalyticsService>().setUserId(uid);
       context.read<SmartAdManager>().preloadRewarded();
       context.read<SmartAdManager>().preloadInterstitial();
       context.read<SmartAdManager>().preloadAppOpen();
@@ -154,23 +189,29 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       context.read<ReferralService>().load(user.uid);
     }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final daily = context.read<DailyBoostService>();
-      if (daily.canClaim) {
-        _showDailyBoostDialog(daily);
-      }
-    });
-
     _maybeShowRateDialogLater();
 
     final iap = context.read<IapService>();
+    final analytics = context.read<AnalyticsService>();
     iap.onPurchaseSuccess = (productId, isSubscription, durationDays) {
+      final p = ShopProducts.oneTimeById(productId);
+      final amount = p != null && p.price.startsWith('\$')
+          ? (double.tryParse(p.price.replaceFirst('\$', '').trim()) ?? 0)
+          : 0.0;
+      analytics.logPurchase(
+        amount: amount,
+        currency: 'USD',
+        productId: productId,
+        transactionId: '${DateTime.now().millisecondsSinceEpoch}',
+      );
       if (isSubscription) {
         game.activatePremium(productId, durationDays);
       } else {
         if (game.hasPurchasedOneTime(productId)) return;
-        final p = ShopProducts.oneTimeById(productId);
+        if (productId == 'season_pass') {
+          context.read<SeasonService>().unlockPremium();
+          return;
+        }
         if (p != null) {
           if (productId == 'boost_2x_1h') game.activateBoost1h();
           game.applyOneTimePurchase(
@@ -188,45 +229,42 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       final events      = context.read<EventService>();
       final energy      = context.read<EnergyCoolingService>();
       final achievements= context.read<AchievementService>();
+      _snapshotTicks++;
+      if (_snapshotTicks >= 15) {
+        _snapshotTicks = 0;
+        game.saveForegroundSnapshot().catchError((_) {});
+      }
+      _localSaveTicks++;
+      if (_localSaveTicks >= 30) {
+        _localSaveTicks = 0;
+        game.persistLocalOnly().catchError((_) {});
+      }
+      final prestige = context.read<PrestigeService>();
+      final adCfg = context.read<AdRemoteConfigService>();
+      final eventMult = adCfg.eventMiningMultiplier != 1.0 ? adCfg.eventMiningMultiplier : events.miningMultiplier;
+      final eventDiscount = adCfg.eventRigDiscount > 0 ? adCfg.eventRigDiscount : events.rigDiscount;
       game.applyExternalGameplayModifiers(
-        eventMiningMultiplier:   events.miningMultiplier,
+        eventMiningMultiplier:   eventMult,
         dailyBoostMultiplier:    daily.miningMultiplier,
         efficiencyMultiplier:    energy.efficiencyMultiplier,
         locationCapacityBonus:   progression.locationCapacityBonus,
-        rigDiscount:             events.rigDiscount,
+        rigDiscount:             eventDiscount,
+        prestigeMultiplier:      prestige.permanentMultiplier,
       );
+      final goals = context.read<GoalsService>();
+      final prevBalance = _lastBalanceForGoals ?? game.btcBalance;
+      _lastBalanceForGoals = game.btcBalance;
+      if (game.btcBalance > prevBalance) goals.addDailyMined(game.btcBalance - prevBalance);
       energy.tickHeat(rigs: game.ownedRigIds.length, miningActive: true);
       progression.evaluateUnlocks(balanceBtc: game.btcBalance, hashRate: game.totalBtcPerMin);
       _evaluateAchievements(game, progression, achievements);
       game.updateTick();
     });
 
-    _syncTimer = Timer.periodic(const Duration(minutes: 3), (_) {
+    // Sync to cloud less often to reduce Firebase usage and cost (RTDB only; leaderboard updated inside syncToCloud).
+    _syncTimer = Timer.periodic(const Duration(minutes: 10), (_) {
       if (!mounted) return;
-      final game = context.read<GameStateService>();
-      game.syncToCloud();
-      final user = context.read<AuthService>().currentUser;
-      if (user != null) {
-        final now = DateTime.now();
-        final minedDelta = (game.lifetimeMinedBtc - _lastLeaderboardMined).abs();
-        final hashDelta  = _lastLeaderboardHash == 0
-            ? game.totalBtcPerMin
-            : ((game.totalBtcPerMin - _lastLeaderboardHash).abs() / _lastLeaderboardHash);
-        final timeDue = _lastLeaderboardPushAt == null ||
-            now.difference(_lastLeaderboardPushAt!).inMinutes >= 10;
-        if (timeDue || minedDelta >= 0.00005 || hashDelta >= 0.1) {
-          context.read<LeaderboardService>().updateUser(
-            uid:         user.uid,
-            displayName: user.displayName ?? user.email ?? 'Miner',
-            totalMined:  game.lifetimeMinedBtc,
-            hashRate:    game.totalBtcPerMin,
-            farmSize:    game.ownedRigIds.length,
-          ).catchError((_) {});
-          _lastLeaderboardPushAt = now;
-          _lastLeaderboardMined  = game.lifetimeMinedBtc;
-          _lastLeaderboardHash   = game.totalBtcPerMin;
-        }
-      }
+      context.read<GameStateService>().syncToCloud();
     });
   }
 
@@ -241,10 +279,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      context.read<GameStateService>().applyIdleEarningsOnResume();
+      final game = context.read<GameStateService>();
+      game.load().then((_) {
+        if (!mounted) return;
+        context.read<GameStateService>().applyIdleEarningsOnResume();
+      });
       context.read<AdRemoteConfigService>().load();
       final cfg   = context.read<AdRemoteConfigService>();
-      final game  = context.read<GameStateService>();
       final pacing= context.read<AdPacingService>();
       final ads   = context.read<SmartAdManager>();
       pacing.canShowAppOpen(completedSessions: game.totalSessionsStarted).then((canShow) async {
@@ -256,9 +297,19 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         } catch (_) {}
       });
     }
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
-      context.read<GameStateService>().saveAndClose();
-      context.read<NotificationService>().scheduleEarningsReminder();
+    // Save lastClosedAt as soon as app loses focus so background mining continues
+    // after close/crash. Fire-and-forget so errors don't crash the app.
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      final game = context.read<GameStateService>();
+      game.saveAndClose().catchError((_) {});
+      if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+        context.read<NotificationService>().scheduleEarningsReminder();
+        if (game.canClaimDaily) {
+          context.read<NotificationService>().scheduleDailyRewardReminder();
+        }
+      }
     }
   }
 
@@ -392,13 +443,25 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       achievements.markClaimed('first_miner');
       game.grantDirectBtc(0.00002);
     }
+    if (!achievements.isClaimed('rigs_5') && game.ownedRigIds.length >= 5) {
+      achievements.markClaimed('rigs_5');
+      game.grantDirectBtc(0.00003);
+    }
     if (!achievements.isClaimed('rigs_10') && game.ownedRigIds.length >= 10) {
       achievements.markClaimed('rigs_10');
       game.grantDirectBtc(0.00008);
     }
+    if (!achievements.isClaimed('sessions_10') && game.totalSessionsStarted >= 10) {
+      achievements.markClaimed('sessions_10');
+      game.grantDirectBtc(0.00004);
+    }
     if (!achievements.isClaimed('hours_100') && game.totalSessionsStarted >= 100) {
       achievements.markClaimed('hours_100');
       game.grantDirectBtc(0.00012);
+    }
+    if (!achievements.isClaimed('lifetime_001') && game.lifetimeMinedBtc >= 0.001) {
+      achievements.markClaimed('lifetime_001');
+      game.grantDirectBtc(0.0001);
     }
     if (!achievements.isClaimed('factory_unlock') &&
         progression.unlockedLocations.contains('factory')) {
@@ -482,13 +545,13 @@ class _LoadingScreenState extends State<_LoadingScreen>
           ),
           const SizedBox(height: 32),
           const Text(
-            'CRYPTOMINER',
+            'Bitcoin Mining',
             style: TextStyle(
               color: _D.gold,
               fontFamily: AppTheme.fontFamily,
               fontWeight: FontWeight.w700,
               fontSize: 20,
-              letterSpacing: 4,
+              letterSpacing: 2,
             ),
           ),
           const SizedBox(height: 12),

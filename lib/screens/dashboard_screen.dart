@@ -13,7 +13,12 @@ import '../services/login_streak_service.dart';
 import '../services/notification_service.dart';
 import '../services/progression_service.dart';
 import '../services/weekly_challenge_service.dart';
+import '../services/goals_service.dart';
+import '../services/season_service.dart';
+import '../services/comeback_bonus_service.dart';
+import '../services/referral_service.dart';
 import '../services/ad_remote_config_service.dart';
+import '../services/analytics_service.dart';
 import '../services/random_drop_service.dart';
 import '../theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -32,6 +37,7 @@ class _D {
   static const electric  = Color(0xFF00D4FF);
   static const green     = Color(0xFF00E5A0);
   static const red       = Color(0xFFFF4D6A);
+  static const purple    = Color(0xFFB06EFF);
   static const textHi    = Color(0xFFF0F4FF);
   static const textMid   = Color(0xFF8899BB);
   static const textLow   = Color(0xFF3D4F6B);
@@ -90,6 +96,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     final adCfg      = context.watch<AdRemoteConfigService>();
     final loginStreak = context.watch<LoginStreakService>();
     final weeklyChallenge = context.watch<WeeklyChallengeService>();
+    final goals = context.watch<GoalsService>();
+    final comeback = context.watch<ComebackBonusService>();
+    final referral = context.watch<ReferralService>();
+    final season = context.watch<SeasonService>();
     if (game.isLoaded) weeklyChallenge.load(game.totalSessionsStarted);
     final idle       = game.getIdleEarnedIfAny();
     final worthUsd   = btcPrice.balanceWorthUsd(game.btcBalance);
@@ -128,11 +138,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                         _GoldBitcoinIcon(pulse: _pulseCtrl),
                         const SizedBox(width: 10),
                         Text(
-                          'CRYPTOMINER',
+                          'Bitcoin Mining',
                           style: _D.fontDisplay.copyWith(
                             fontSize: 16,
                             color: _D.gold,
-                            letterSpacing: 3,
+                            letterSpacing: 2,
                           ),
                         ),
                       ],
@@ -191,6 +201,24 @@ class _DashboardScreenState extends State<DashboardScreen>
 
                         // ── Mining session ───────────────────────────────
                         _MiningSessionCard(game: game),
+                        const SizedBox(height: 14),
+
+                        // ── Daily & weekly goals ──────────────────────────
+                        _GoalsCard(goals: goals, game: game),
+                        const SizedBox(height: 14),
+
+                        // ── Come-back bonus ───────────────────────────────
+                        if (comeback.canClaim) ...[
+                          _ComebackCard(comeback: comeback, game: game),
+                          const SizedBox(height: 14),
+                        ],
+
+                        // ── Refer-a-friend (prominent) ───────────────────
+                        _ReferralPromoCard(referral: referral),
+                        const SizedBox(height: 14),
+
+                        // ── Season / battle pass ──────────────────────────
+                        _SeasonCard(season: season, game: game),
                         const SizedBox(height: 14),
 
                         // ── Login streak (daily comeback) ─────────────────
@@ -685,6 +713,9 @@ class _MiningSessionCard extends StatelessWidget {
             onTap: () async {
               await game.startMiningSession();
               if (context.mounted) {
+                context.read<GoalsService>().addWeeklySession();
+                context.read<SeasonService>().addXp(SeasonService.xpPerSession);
+                context.read<AnalyticsService>().logSessionStart();
                 context.read<NotificationService>().showMiningSessionStarted();
                 _toast(context, '⚡ Mining session started (30 min)');
               }
@@ -694,6 +725,232 @@ class _MiningSessionCard extends StatelessWidget {
       ],
     ),
   );
+}
+
+// ─── Daily & weekly goals card ────────────────────────────────────────────────
+class _GoalsCard extends StatelessWidget {
+  final GoalsService goals;
+  final GameStateService game;
+  const _GoalsCard({required this.goals, required this.game});
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassCard(
+      borderColor: _D.electric.withValues(alpha: 0.3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _D.electric.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.flag_rounded, color: _D.electric, size: 22),
+              ),
+              const SizedBox(width: 14),
+              const Text(
+                'Daily & weekly goals',
+                style: TextStyle(color: _D.textHi, fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Daily: mine ${GoalsService.dailyTargetBtc.toStringAsFixed(4)} BTC · ${(goals.dailyProgressPercent * 100).toStringAsFixed(0)}%',
+            style: const TextStyle(color: _D.textMid, fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Weekly: ${goals.weeklyProgressSessions}/${GoalsService.weeklyTargetSessions} sessions',
+            style: const TextStyle(color: _D.textMid, fontSize: 12),
+          ),
+          if (goals.canClaimDaily || goals.canClaimWeekly) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (goals.canClaimDaily)
+                  _SmallRewardChip(
+                    label: 'Claim daily +${GoalsService.dailyRewardBtc.toStringAsFixed(5)} BTC',
+                    onTap: () async {
+                      await game.grantDirectBtc(GoalsService.dailyRewardBtc);
+                      await goals.claimDaily();
+                      if (context.mounted) _toast(context, '🎯 Daily goal reward!');
+                    },
+                  ),
+                if (goals.canClaimWeekly)
+                  _SmallRewardChip(
+                    label: 'Claim weekly +${GoalsService.weeklyRewardBtc.toStringAsFixed(5)} BTC',
+                    onTap: () async {
+                      await game.grantDirectBtc(GoalsService.weeklyRewardBtc);
+                      await goals.claimWeekly();
+                      if (context.mounted) _toast(context, '🎯 Weekly goal reward!');
+                    },
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Come-back bonus card ─────────────────────────────────────────────────────
+class _ComebackCard extends StatelessWidget {
+  final ComebackBonusService comeback;
+  final GameStateService game;
+  const _ComebackCard({required this.comeback, required this.game});
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassCard(
+      borderColor: _D.gold.withValues(alpha: 0.4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.waving_hand_rounded, color: _D.gold, size: 24),
+              const SizedBox(width: 12),
+              const Text(
+                'We missed you!',
+                style: TextStyle(color: _D.textHi, fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Claim your welcome-back bonus: +${ComebackBonusService.bonusBtc.toStringAsFixed(5)} BTC',
+            style: const TextStyle(color: _D.textMid, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: _PrimaryBtn(
+              label: 'Claim bonus',
+              icon: Icons.card_giftcard_rounded,
+              onTap: () async {
+                await game.grantDirectBtc(ComebackBonusService.bonusBtc);
+                await comeback.markClaimed();
+                if (context.mounted) _toast(context, '🎁 Welcome back!');
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Referral promo card (invite friends) ──────────────────────────────────────
+class _ReferralPromoCard extends StatelessWidget {
+  final ReferralService referral;
+  const _ReferralPromoCard({required this.referral});
+
+  @override
+  Widget build(BuildContext context) {
+    final friends = referral.friends;
+    final code = referral.myCode ?? '------';
+    return _GlassCard(
+      borderColor: _D.purple.withValues(alpha: 0.35),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _D.purple.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.people_rounded, color: _D.purple, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Invite friends',
+                    style: TextStyle(color: _D.textHi, fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                  Text(
+                    '$friends invited · Code: $code',
+                    style: const TextStyle(color: _D.textMid, fontSize: 12),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Get BTC & rigs when friends join. Share your code from Profile.',
+            style: TextStyle(color: _D.textLow, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Season / battle pass card ─────────────────────────────────────────────────
+class _SeasonCard extends StatelessWidget {
+  final SeasonService season;
+  final GameStateService game;
+  const _SeasonCard({required this.season, required this.game});
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassCard(
+      borderColor: _D.gold.withValues(alpha: 0.3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.emoji_events_rounded, color: _D.gold, size: 22),
+              const SizedBox(width: 10),
+              Text(
+                'Season ${season.seasonId}',
+                style: const TextStyle(color: _D.textHi, fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${season.xp} XP · Complete sessions & dailies for rewards',
+            style: const TextStyle(color: _D.textMid, fontSize: 12),
+          ),
+          if (SeasonService.freeMilestones.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: List.generate(SeasonService.freeMilestones.length, (i) {
+                final canClaim = season.canClaimFree(i);
+                if (!canClaim && season.xp < SeasonService.freeMilestones[i]) return const SizedBox.shrink();
+                return _SmallRewardChip(
+                  label: '${SeasonService.freeMilestones[i]} XP: +${SeasonService.freeRewardsBtc[i].toStringAsFixed(5)} BTC',
+                  onTap: canClaim
+                      ? () async {
+                          await game.grantDirectBtc(SeasonService.freeRewardsBtc[i]);
+                          await season.claimFreeReward(i);
+                          if (context.mounted) _toast(context, '🏆 Season reward!');
+                        }
+                      : () {},
+                );
+              }),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 // ─── Login streak card (daily comeback) ───────────────────────────────────────

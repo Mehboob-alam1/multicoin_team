@@ -11,7 +11,7 @@ class NotificationService extends ChangeNotifier {
   String? get token => _token;
 
   static const _channelId = 'btc_sim_channel';
-  static const _channelName = 'BTC Mining Simulator';
+  static const _channelName = 'Bitcoin Mining';
 
   final FlutterLocalNotificationsPlugin _local = FlutterLocalNotificationsPlugin();
   bool _localInitialized = false;
@@ -58,6 +58,8 @@ class NotificationService extends ChangeNotifier {
 
   static const _idSpinReminder = 10;
   static const _idEarningsReminder = 11;
+  static const _idDailyRewardReminder = 12;
+  static const _idBoostReminder = 13;
 
   /// Schedule "Your Lucky Spin is ready!" for 24 hours from now. Call after user spins.
   Future<void> scheduleSpinReminder() async {
@@ -100,6 +102,56 @@ class NotificationService extends ChangeNotifier {
         _idEarningsReminder,
         'You\'re earning BTC!',
         'Come back to collect your mining earnings.',
+        when,
+        details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (_) {}
+  }
+
+  /// Schedule "Daily reward ready!" for 20 hours. Call when user has not claimed daily.
+  Future<void> scheduleDailyRewardReminder() async {
+    if (!_localInitialized) return;
+    try {
+      await _local.cancel(_idDailyRewardReminder);
+      final when = tz.TZDateTime.now(tz.local).add(const Duration(hours: 20));
+      final android = AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: 'Mining session and app notifications',
+      );
+      final details = NotificationDetails(android: android);
+      await _local.zonedSchedule(
+        _idDailyRewardReminder,
+        'Daily reward ready!',
+        'Claim your daily BTC and keep your streak.',
+        when,
+        details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    } catch (_) {}
+  }
+
+  /// Schedule "2× Boost available" for 1 hour. Call when boost expires soon.
+  Future<void> scheduleBoostReminder(Duration inDuration) async {
+    if (!_localInitialized) return;
+    try {
+      await _local.cancel(_idBoostReminder);
+      final when = tz.TZDateTime.now(tz.local).add(inDuration);
+      final android = AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: 'Mining session and app notifications',
+      );
+      final details = NotificationDetails(android: android);
+      await _local.zonedSchedule(
+        _idBoostReminder,
+        'Mining boost',
+        'Your 2× boost is available again.',
         when,
         details,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,

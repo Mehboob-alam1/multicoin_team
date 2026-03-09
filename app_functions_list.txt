@@ -1,0 +1,407 @@
+================================================================================
+BTC SIM APP - ALL FUNCTIONS BY FILE
+================================================================================
+
+---- main.dart ----
+  _firebaseMessagingBackgroundHandler(RemoteMessage message)  [top-level]
+  _workmanagerDispatcher()                                    [top-level]
+  main()
+
+---- app.dart ----
+  build(BuildContext context)
+  _authWrapper(BuildContext context)
+
+---- lib/services/achievement_service.dart (AchievementService) ----
+  load()
+  isClaimed(String id)
+  markClaimed(String id)
+
+---- lib/services/ad_pacing_service.dart (AdPacingService) ----
+  load()
+  incrementRewardedWatched()
+  registerNavigationTransition()
+  shouldShowInterstitial({required int completedSessions})
+  markInterstitialShown()
+  canShowAppOpen({required int completedSessions})
+  markAppOpenShown()
+  canShowRewarded()
+  markRewardedShown()
+  _rolloverIfNeeded()
+  _todayKey()
+
+---- lib/services/ad_remote_config_service.dart (AdRemoteConfigService) ----
+  _getBool(String key)
+  _getString(String key)
+  defaultParameters  [static getter]
+  load()
+  openCustomTab(String url)
+
+---- lib/services/ad_reward_service.dart (AdRewardService) ----
+  loadAd()
+  show(String rewardType)
+
+---- lib/services/analytics_service.dart (AnalyticsService) ----
+  initFromRemoteConfig()
+  logScreenView(String screenName, {String? screenClass})
+  logSessionStart()
+  logCompletedRegistration({String? method})
+  logPurchase({amount, currency, productId?, transactionId?})
+  logLuckySpin({String? rewardType})
+  logRewardedAdWatched({String? placement})
+  logWithdrawalIntent({bool? eligible})
+  logEvent(String name, [Map<String, Object>? params])
+  setUserId(String? uid)
+
+---- lib/services/auth_service.dart (AuthService) ----
+  signInAnonymously()
+  signInWithGoogle()
+  linkWithGoogle()
+  signOut()
+
+---- lib/services/btc_price_service.dart (BtcPriceService) ----
+  fetchPrice()
+  fetchChartHistory({int days = 30})
+  fetchAll()
+  _fetchPrice()
+  _fetchChart(int days)
+
+---- lib/services/comeback_bonus_service.dart (ComebackBonusService) ----
+  load()
+  recordOpen()
+  markClaimed()
+
+---- lib/services/daily_boost_service.dart (DailyBoostService) ----
+  recordDialogShownForCurrentDay()
+  load()
+  claim()
+
+---- lib/services/energy_cooling_service.dart (EnergyCoolingService) ----
+  load()
+  tickHeat({required int rigs, required bool miningActive})
+  upgradeCooling()
+  upgradePower()
+  upgradeSolar()
+
+---- lib/services/event_service.dart (EventService) ----
+  load()
+  refreshFromFirebaseIfNeeded()
+  refreshFromFirebase()
+
+---- lib/services/firebase_sync_service.dart (FirebaseSyncService) ----
+  syncPlayerData(String uid, PlayerData data, {String? displayName})
+  fetchPlayerData(String uid)
+  updateLeaderboard(uid, displayName, btcBalance, totalBtcPerMin)
+  recordOneTimePurchase(String uid, String productId)
+  recordSubscription(String uid, String planId, DateTime expiry)
+  hasOneTimePurchase(String uid, String productId)
+  recordBoostExpiry(String uid, DateTime expiry)
+  getBoostExpiry(String uid)
+  getSubscriptionExpiry(String uid)
+
+---- lib/services/game_state_service.dart (GameStateService) ----
+  _totalBtcPerMinWithSession(bool sessionActive)
+  applyExternalGameplayModifiers({eventMiningMultiplier, dailyBoostMultiplier, efficiencyMultiplier, locationCapacityBonus, rigDiscount, prestigeMultiplier})
+  _oneTimeMiningMultiplier()
+  setUserId(String? id)
+  setDisplayName(String? name)
+  load()
+  _applyIdleFromForegroundSnapshotIfNeeded(SharedPreferences prefs, String dataKey)
+  _loadBoostExpiry()
+  _applyIdleEarnings()
+  applyIdleEarningsOnResume()
+  persistLocalOnly()
+  _persistLocalOnlyImpl()
+  _persist({bool forceRemote, bool markDirty})
+  saveAndClose()
+  syncToCloud()
+  saveForegroundSnapshot()
+  rigCost(MiningRig rig)
+  buyRig(MiningRig rig)
+  canAfford(MiningRig rig)
+  canSpendBtc(double amount)
+  deductBtc(double amount)
+  grantDirectBtc(double amount)
+  grantRig(String rigId)
+  hasPurchasedOneTime(String productId)
+  claimDailyReward(int day)
+  claimDaily()
+  canClaimMilestone(String id)
+  claimMilestone(String id)
+  applyOneTimePurchase({productId, btc?, rigId?, boostDuration?})
+  activateBoost({Duration duration})
+  activateBoost1h()
+  startMiningSession()
+  upgradeFarm()
+  activatePremium(String planId, int durationDays)
+  grantAdReward(String type)
+  updateTick()
+  tick()
+
+---- lib/services/goals_service.dart (GoalsService) ----
+  _epochDay(DateTime d)     [static]
+  _epochWeek(DateTime d)   [static]
+  load()
+  addDailyMined(double btc)
+  addWeeklySession()
+  claimDaily()
+  claimWeekly()
+
+---- lib/services/iap_service.dart (IapService) ----
+  init()
+  loadProducts()
+  _onPurchaseUpdate(List<PurchaseDetails> details)
+  _deliverPurchase(String productId)
+  buyProduct(String productId)
+  buySubscription(String productId)
+  restorePurchases()
+  dispose()
+
+---- lib/services/leaderboard_service.dart (LeaderboardService) ----
+  loadCache()
+  fetchTop()
+
+---- lib/services/local_feature_store.dart (LocalFeatureStore) ----
+  init()                    [static]
+  get(String key, [defaultValue])  [static]
+  set(String key, dynamic value)   [static]
+
+---- lib/services/login_streak_service.dart (LoginStreakService) ----
+  load()
+  recordLogin()
+  markStreak3Claimed()
+  markStreak7Claimed()
+
+---- lib/services/lucky_spin_service.dart (LuckySpinService) ----
+  load()
+  spin()
+
+---- lib/services/mini_game_service.dart (MiniGameService) ----
+  load()
+  recordPlay({required int taps, required int elapsedMs})
+
+---- lib/services/notification_service.dart (NotificationService) ----
+  init()
+  scheduleSpinReminder()
+  scheduleEarningsReminder()
+  scheduleDailyRewardReminder()
+  scheduleBoostReminder(Duration inDuration)
+  showMiningSessionStarted()
+
+---- lib/services/prestige_service.dart (PrestigeService) ----
+  load()
+  performPrestige()
+  canPrestige(double lifetimeMinedBtc)
+
+---- lib/services/progression_service.dart (ProgressionService) ----
+  load()
+  evaluateUnlocks({balanceBtc, hashRate, ownedRigIds})
+
+---- lib/services/random_drop_service.dart (RandomDropService) ----
+  load()
+  scheduleNext()
+  collect()
+
+---- lib/services/rate_app_service.dart (RateAppService) ----
+  shouldShowRateDialog({...})
+  markRateDialogShown()
+
+---- lib/services/referral_service.dart (ReferralService) ----
+  load(String uid)
+  applyReferral(String myUid, String code)
+  canClaimReward(String id)
+  markClaimed(String id)
+
+---- lib/services/season_service.dart (SeasonService) ----
+  canClaimFree(int index)
+  load()
+  addXp(int amount)
+  claimFreeReward(int milestoneIndex)
+  unlockPremium()
+
+---- lib/services/smart_ad_manager.dart (SmartAdManager / inner classes) ----
+  dispose()
+  preloadRewarded()
+  showRewarded({required VoidCallback onEarned})
+  preloadInterstitial()
+  showInterstitial()
+  loadBanner(AdSize size)
+  preloadAppOpen()
+  showAppOpen()
+  loadNative({required String factoryId})
+  dispose()
+
+---- lib/services/weekly_challenge_service.dart (WeeklyChallengeService) ----
+  progressThisWeek(int totalSessionsStarted)
+  isComplete(int totalSessionsStarted)
+  canClaim(int totalSessionsStarted)
+  _weekId(DateTime d)       [static]
+  load(int totalSessionsStarted)
+  syncSessionsStart(int totalSessionsStarted)
+  markClaimed()
+
+---- lib/services/withdrawal_service.dart (WithdrawalService) ----
+  load()
+  recheckUnlock({...})
+  meetsSessions(int totalSessionsStarted)
+  meetsRewardedAds(int rewardedAdsWatched)
+  meetsMinBtc(double btcBalance)
+  minBtcForWithdrawal(double usdPerBtc)
+
+---- lib/game_engine/mining_engine.dart (MiningEngine) ----
+  effectiveRate({baseRatePerMin, farmMultiplier, sessionMultiplier, premiumMultiplier, boostMultiplier, eventMultiplier, efficiencyMultiplier})  [static]
+
+---- lib/screens/dashboard_screen.dart ----
+  initState(), dispose(), build(), _toast(), and various widget build methods
+
+---- lib/screens/home_shell.dart (_HomeShellState, _NavTile, etc.) ----
+  initState()
+  dispose()
+  didChangeAppLifecycleState(AppLifecycleState state)
+  _showDailyBoostDialog(DailyBoostService daily)
+  _maybeShowRateDialogLater()
+  build(BuildContext context)
+  _evaluateAchievements(...)
+  _onTabTapped(int i)
+  [Nav tile / shell widget build methods]
+
+---- lib/screens/leaderboard_screen.dart ----
+  didChangeDependencies()
+  dispose()
+  _load()
+  _switchMetric(String key)
+  _sortEntries()
+  build(), _buildBody(), _valueStr(), _trailing(), paint(), shouldRepaint(), etc.
+
+---- lib/screens/login_screen.dart ----
+  dispose()
+  _signInGoogle(AuthService auth)
+  _signInGuest(AuthService auth)
+  _toast(String msg)
+  build(), paint(), drawOrbit(), shouldRepaint()
+
+---- lib/screens/lucky_spin_screen.dart ----
+  initState(), dispose()
+  _applyResultAndPop()
+  _onSpin()
+  build(), paint(), shouldRepaint()
+
+---- lib/screens/mining_farm_screen.dart ----
+  build(), _toast(), and widget build methods
+
+---- lib/screens/mini_game_screen.dart ----
+  dispose()
+  _start()
+  _endGame()
+  build()
+
+---- lib/screens/premium_offer_screen.dart ----
+  initState()
+  build()
+  _goHome(BuildContext context)
+  _subscribe(BuildContext context, PremiumPlan plan)
+  _toast(BuildContext context, String msg)
+
+---- lib/screens/profile_screen.dart ----
+  build() and widget build methods
+
+---- lib/screens/rewards_screen.dart ----
+  build() methods, _toast()
+
+---- lib/screens/shop_screen.dart ----
+  dispose()
+  build()
+  _parseBtcPrice(String price)
+  _onPurchase(BuildContext context, OneTimeProduct product)
+  _formatExpiry(DateTime? e)
+  _subscribe(BuildContext context, PremiumPlan plan)
+  _toast(BuildContext context, String msg)
+
+---- lib/widgets/btc_price_chart.dart ----
+  build()
+  _shortPrice(double v)
+
+---- lib/widgets/smart_banner_ad.dart ----
+  initState(), dispose(), build()
+
+---- lib/widgets/minimizable_native_ad.dart ----
+  _load(), build(), dispose()
+
+---- lib/widgets/rate_app_dialog.dart ----
+  (dialog widget build methods)
+
+---- lib/services/background_mining_task.dart ----
+  backgroundMiningCallback()  [used by Workmanager]
+
+---- lib/screens/news_screen.dart ----
+  (screen build / load methods)
+
+================================================================================
+SUMMARY BY CATEGORY
+================================================================================
+
+AUTH & USER
+  signInAnonymously, signInWithGoogle, linkWithGoogle, signOut (AuthService)
+  setUserId, setDisplayName (GameStateService)
+  setUserId (AnalyticsService)
+
+GAME STATE & MINING
+  load, tick, updateTick, syncToCloud, saveAndClose, persistLocalOnly, saveForegroundSnapshot (GameStateService)
+  applyIdleEarningsOnResume, applyExternalGameplayModifiers (GameStateService)
+  buyRig, deductBtc, grantDirectBtc, grantRig, rigCost, canAfford, canSpendBtc (GameStateService)
+  claimDailyReward, claimDaily, claimMilestone, canClaimMilestone (GameStateService)
+  applyOneTimePurchase, activateBoost, activateBoost1h, startMiningSession, upgradeFarm, activatePremium, grantAdReward (GameStateService)
+  hasPurchasedOneTime (GameStateService)
+  effectiveRate (MiningEngine)
+
+FIREBASE SYNC
+  syncPlayerData, fetchPlayerData, updateLeaderboard (FirebaseSyncService)
+  recordOneTimePurchase, recordSubscription, recordBoostExpiry (FirebaseSyncService)
+  hasOneTimePurchase, getBoostExpiry, getSubscriptionExpiry (FirebaseSyncService)
+
+LEADERBOARD & EVENTS
+  loadCache, fetchTop (LeaderboardService)
+  load, refreshFromFirebaseIfNeeded, refreshFromFirebase (EventService)
+
+GOALS & REWARDS
+  load, addDailyMined, addWeeklySession, claimDaily, claimWeekly (GoalsService)
+  load, spin (LuckySpinService)
+  load, recordDialogShownForCurrentDay, claim (DailyBoostService)
+  load, recordPlay (MiniGameService)
+  load, canClaimFree, addXp, claimFreeReward, unlockPremium (SeasonService)
+  load, performPrestige, canPrestige (PrestigeService)
+  load, progressThisWeek, isComplete, canClaim, syncSessionsStart, markClaimed (WeeklyChallengeService)
+  load, recordOpen, markClaimed (ComebackBonusService)
+  load, scheduleNext, collect (RandomDropService)
+  load, recordLogin, markStreak3Claimed, markStreak7Claimed (LoginStreakService)
+
+ACHIEVEMENTS & REFERRAL
+  load, isClaimed, markClaimed (AchievementService)
+  load, applyReferral, canClaimReward, markClaimed (ReferralService)
+
+IAP & SHOP
+  init, loadProducts, buyProduct, buySubscription, restorePurchases (IapService)
+
+ANALYTICS
+  initFromRemoteConfig, logScreenView, logSessionStart, logCompletedRegistration, logPurchase (AnalyticsService)
+  logLuckySpin, logRewardedAdWatched, logWithdrawalIntent, logEvent, setUserId (AnalyticsService)
+
+ADS & REMOTE CONFIG
+  load, openCustomTab (AdRemoteConfigService)
+  load(), shouldShowInterstitial, markInterstitialShown, canShowAppOpen, markAppOpenShown, canShowRewarded, markRewardedShown (AdPacingService)
+  preloadRewarded, showRewarded, preloadInterstitial, showInterstitial, loadBanner, preloadAppOpen, showAppOpen, loadNative (SmartAdManager)
+  loadAd, show (AdRewardService)
+
+NOTIFICATIONS
+  init, scheduleSpinReminder, scheduleEarningsReminder, scheduleDailyRewardReminder, scheduleBoostReminder, showMiningSessionStarted (NotificationService)
+
+OTHER SERVICES
+  load, recheckUnlock, meetsSessions, meetsRewardedAds, meetsMinBtc, minBtcForWithdrawal (WithdrawalService)
+  load, evaluateUnlocks (ProgressionService)
+  fetchPrice, fetchChartHistory, fetchAll (BtcPriceService)
+  load, tickHeat, upgradeCooling, upgradePower, upgradeSolar (EnergyCoolingService)
+  shouldShowRateDialog, markRateDialogShown (RateAppService)
+  init, get, set (LocalFeatureStore)
+
+================================================================================
+End of list. (Flutter lifecycle methods such as build, initState, dispose, paint, shouldRepaint are present in widgets but not listed individually in the summary.)
+================================================================================

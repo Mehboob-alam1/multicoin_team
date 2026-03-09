@@ -45,7 +45,7 @@ class RateAppDialog {
                   Icon(Icons.currency_bitcoin_rounded, color: _gold, size: 48),
                   const SizedBox(height: 16),
                   const Text(
-                    'Enjoying BTC Mining Simulator?',
+                    'Enjoying Bitcoin Mining?',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: _textHi,

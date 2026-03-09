@@ -1,6 +1,13 @@
 import 'package:firebase_database/firebase_database.dart';
 import '../models/player_data.dart';
 
+/// Firebase usage is kept low to control costs:
+/// - Sync to cloud every 10 min (home_shell), min interval 12 min (game_state).
+/// - Game state fetches from Firebase only once per app session.
+/// - Leaderboard: RTDB only, 100 entries, 5 min cache (LeaderboardService.fetchTop).
+/// - Events: Firestore refresh at most every 6 h (EventService).
+/// - Referral: Firestore cache 24 h (ReferralService).
+/// - Remote Config: fetch at most every 6 h in release.
 class FirebaseSyncService {
   final _db = FirebaseDatabase.instance;
   static const _users = 'users';
@@ -58,7 +65,7 @@ class FirebaseSyncService {
   /// Get top entries by balance (descending). Returns list of [rank, displayName, btcBalance, totalBtcPerMin].
   Future<List<LeaderboardEntry>> getLeaderboard({int limit = 100}) async {
     try {
-      final snap = await _db.ref('$_leaderboard/entries').orderByChild('btcBalance').limitToLast(500).get();
+      final snap = await _db.ref('$_leaderboard/entries').orderByChild('btcBalance').limitToLast(100).get();
       if (!snap.exists || snap.value == null) return [];
       final map = snap.value as Map<dynamic, dynamic>;
       final list = map.entries

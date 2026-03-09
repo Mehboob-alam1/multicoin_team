@@ -4,6 +4,11 @@ import 'local_feature_store.dart';
 
 class ReferralService extends ChangeNotifier {
   final _firestore = FirebaseFirestore.instance;
+  static const _cacheKeyCode = 'referral_my_code';
+  static const _cacheKeyFriends = 'referral_friends';
+  static const _cacheKeyTime = 'referral_cache_time_ms';
+  static const _cacheMaxAge = Duration(hours: 24);
+
   String? _myCode;
   int _friends = 0;
   List<String> _claimed = [];
@@ -16,6 +21,16 @@ class ReferralService extends ChangeNotifier {
     await LocalFeatureStore.init();
     final rawClaimed = LocalFeatureStore.get('referral_claimed', const <String>[]);
     if (rawClaimed is List) _claimed = rawClaimed.map((e) => e.toString()).toList();
+    final cacheTimeMs = LocalFeatureStore.get(_cacheKeyTime);
+    final cacheTime = cacheTimeMs is int ? cacheTimeMs as int? : null;
+    if (cacheTime != null &&
+        DateTime.now().millisecondsSinceEpoch - cacheTime < _cacheMaxAge.inMilliseconds) {
+      _myCode = LocalFeatureStore.get(_cacheKeyCode)?.toString();
+      final f = LocalFeatureStore.get(_cacheKeyFriends);
+      _friends = (f is num) ? f.toInt() : 0;
+      notifyListeners();
+      return;
+    }
     final doc = await _firestore.collection('referrals').doc(uid).get();
     if (!doc.exists) {
       _myCode = uid.substring(0, 6).toUpperCase();
@@ -29,6 +44,9 @@ class ReferralService extends ChangeNotifier {
       _myCode = d['code']?.toString();
       _friends = (d['friends'] as num?)?.toInt() ?? 0;
     }
+    await LocalFeatureStore.set(_cacheKeyCode, _myCode);
+    await LocalFeatureStore.set(_cacheKeyFriends, _friends);
+    await LocalFeatureStore.set(_cacheKeyTime, DateTime.now().millisecondsSinceEpoch);
     notifyListeners();
   }
 

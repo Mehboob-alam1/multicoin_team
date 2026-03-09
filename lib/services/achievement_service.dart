@@ -15,10 +15,15 @@ class AchievementService extends ChangeNotifier {
 
   static const defs = [
     AchievementDef('first_miner', 'First Miner', 'Own your first rig', 0.00002),
-    AchievementDef('btc_1', '1 BTC (sim goal)', 'Mine cumulative milestones', 0.0002),
+    AchievementDef('rigs_5', '5 Rigs', 'Own 5 rigs', 0.00003),
     AchievementDef('rigs_10', '10 Rigs Built', 'Own 10 rigs', 0.00008),
-    AchievementDef('hours_100', '100 Hours Mining', 'Run long mining sessions', 0.00012),
+    AchievementDef('sessions_10', '10 Sessions', 'Start 10 mining sessions', 0.00004),
+    AchievementDef('hours_100', '100 Hours Mining', 'Run 100 mining sessions', 0.00012),
+    AchievementDef('lifetime_001', '0.001 BTC Mined', 'Lifetime mined ≥ 0.001 BTC', 0.0001),
+    AchievementDef('btc_1', '1 BTC (sim goal)', 'Mine cumulative milestones', 0.0002),
     AchievementDef('factory_unlock', 'Factory Unlocked', 'Unlock Factory location', 0.0001),
+    AchievementDef('spin_5', 'Lucky Spinner', 'Use Lucky Spin 5 times', 0.00002),
+    AchievementDef('daily_7', 'Week Warrior', 'Claim 7-day daily reward', 0.00005),
   ];
 
   List<String> get claimed => List.unmodifiable(_claimed);

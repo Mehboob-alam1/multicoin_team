@@ -62,7 +62,7 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _googleLoading = true);
     try {
       await auth.signInWithGoogle();
-      if (mounted) Navigator.of(context).pushReplacementNamed('/home');
+      if (mounted) Navigator.of(context).pushReplacementNamed('/premium-offer');
     } catch (e) {
       if (mounted) _toast('Sign-in failed: $e');
     } finally {
@@ -74,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen>
     setState(() => _guestLoading = true);
     try {
       await auth.signInAnonymously();
-      if (mounted) Navigator.of(context).pushReplacementNamed('/home');
+      if (mounted) Navigator.of(context).pushReplacementNamed('/premium-offer');
     } catch (e) {
       if (mounted) _toast('Could not continue as guest: $e');
     } finally {
@@ -144,13 +144,13 @@ class _LoginScreenState extends State<LoginScreen>
 
                         // ── Headline ──────────────────────────────────────
                         const Text(
-                          'CRYPTOMINER',
+                          'Bitcoin Mining',
                           style: TextStyle(
                             color: _D.gold,
                             fontFamily: AppTheme.fontFamily,
                             fontWeight: FontWeight.w900,
                             fontSize: 28,
-                            letterSpacing: 5,
+                            letterSpacing: 2,
                           ),
                         ),
                         const SizedBox(height: 10),

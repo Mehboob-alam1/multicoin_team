@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/farm_tier.dart';
 import '../models/mining_rig.dart';
 import '../models/player_data.dart';
+import 'background_mining_task.dart';
 import 'firebase_sync_service.dart';
 
 class GameStateService extends ChangeNotifier {
@@ -11,9 +12,10 @@ class GameStateService extends ChangeNotifier {
 
   final FirebaseSyncService _firebaseSync;
   static const _key = 'btc_sim_player_data';
+  static const _foregroundSnapshotKey = 'btc_sim_foreground_snapshot';
   static const _maxIdleMinutes = 8 * 60;
   static const _sessionMinutes = 30;
-  static const _minRemoteSyncInterval = Duration(minutes: 5);
+  static const _minRemoteSyncInterval = Duration(minutes: 12);
 
   PlayerData _data = const PlayerData();
   DateTime? _lastTick;
@@ -27,9 +29,11 @@ class GameStateService extends ChangeNotifier {
   DateTime? _boostExpiry;
   DateTime? _lastRemoteSyncAt;
   bool _remoteDirty = false;
+  bool _fetchedRemoteThisSession = false;
   double _eventMiningMultiplier = 1.0;
   double _dailyBoostMultiplier = 1.0;
   double _efficiencyMultiplier = 1.0;
+  double _prestigeMultiplier = 1.0;
   int _locationCapacityBonus = 0;
   double _rigDiscount = 0.0;
 
@@ -76,6 +80,7 @@ class GameStateService extends ChangeNotifier {
     mult *= _eventMiningMultiplier;
     mult *= _dailyBoostMultiplier;
     mult *= _efficiencyMultiplier;
+    mult *= _prestigeMultiplier;
     return sum * mult;
   }
 
@@ -85,17 +90,20 @@ class GameStateService extends ChangeNotifier {
     required double efficiencyMultiplier,
     required int locationCapacityBonus,
     double rigDiscount = 0.0,
+    double prestigeMultiplier = 1.0,
   }) {
     final changed = _eventMiningMultiplier != eventMiningMultiplier ||
         _dailyBoostMultiplier != dailyBoostMultiplier ||
         _efficiencyMultiplier != efficiencyMultiplier ||
         _locationCapacityBonus != locationCapacityBonus ||
-        _rigDiscount != rigDiscount;
+        _rigDiscount != rigDiscount ||
+        _prestigeMultiplier != prestigeMultiplier;
     _eventMiningMultiplier = eventMiningMultiplier;
     _dailyBoostMultiplier = dailyBoostMultiplier;
     _efficiencyMultiplier = efficiencyMultiplier;
     _locationCapacityBonus = locationCapacityBonus;
     _rigDiscount = rigDiscount;
+    _prestigeMultiplier = prestigeMultiplier;
     if (changed) notifyListeners();
   }
 
@@ -123,7 +131,10 @@ class GameStateService extends ChangeNotifier {
     return 1;
   }
 
-  void setUserId(String? id) => _userId = id;
+  void setUserId(String? id) {
+    if (_userId != id) _fetchedRemoteThisSession = false;
+    _userId = id;
+  }
   void setDisplayName(String? name) {
     if (name != null && name.isNotEmpty) _displayName = name;
   }
@@ -132,31 +143,39 @@ class GameStateService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final key = _userId != null ? '${_key}_$_userId' : _key;
 
-    if (_userId != null) {
-      final remote = await _firebaseSync.fetchPlayerData(_userId!);
-      if (remote != null) _data = remote;
-      final oneTime = await _firebaseSync.getOneTimePurchases(_userId!);
-      _purchasedOneTimeIds = oneTime;
-      _premiumExpiry = await _firebaseSync.getSubscriptionExpiry(_userId!);
-      _boostExpiry = await _loadBoostExpiry();
-    }
+    // Start from default so each user is isolated; never carry over another user's data.
+    _data = const PlayerData();
 
-    if (_data.ownedRigIds.isEmpty) {
+    // Load local data for this user (key is per-user). Skip for null userId so guest always starts from 0.
+    bool hadLocalData = false;
+    if (_userId != null) {
       final raw = prefs.getString(key);
       if (raw != null) {
+        hadLocalData = true;
         try {
           _data = PlayerData.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
         } catch (_) {}
       }
-      if (_data.ownedRigIds.isEmpty) _data = const PlayerData();
-    } else {
-      final raw = prefs.getString(key);
-      if (raw != null) {
-        try {
-          final local = PlayerData.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
-          if (local.lastClosedAt != null) _data = _data.copyWith(lastClosedAt: local.lastClosedAt);
-        } catch (_) {}
+    }
+
+    // For logged-in user: fetch remote only once per app session to reduce Firebase usage.
+    // If no local data (e.g. fresh install), do NOT use remote so user always starts from 0.
+    if (_userId != null && !_fetchedRemoteThisSession) {
+      _fetchedRemoteThisSession = true;
+      final remote = await _firebaseSync.fetchPlayerData(_userId!);
+      if (remote != null && hadLocalData) {
+        final localData = _data; // _data is still local here
+        _data = remote;
+        // Never lose mining balance: take the higher of local vs remote.
+        _data = _data.copyWith(
+          btcBalance: localData.btcBalance > remote.btcBalance ? localData.btcBalance : remote.btcBalance,
+          lifetimeMinedBtc: localData.lifetimeMinedBtc > remote.lifetimeMinedBtc ? localData.lifetimeMinedBtc : remote.lifetimeMinedBtc,
+        );
       }
+      final oneTime = await _firebaseSync.getOneTimePurchases(_userId!);
+      _purchasedOneTimeIds = oneTime;
+      _premiumExpiry = await _firebaseSync.getSubscriptionExpiry(_userId!);
+      _boostExpiry = await _loadBoostExpiry();
     }
 
     _lastTick = DateTime.now();
@@ -165,9 +184,51 @@ class GameStateService extends ChangeNotifier {
       _data = _data.copyWith(miningSessionEndsAt: null);
     }
     _applyIdleEarnings();
+    if (_userId != null) await _applyIdleFromForegroundSnapshotIfNeeded(prefs, key);
     await _persist(forceRemote: false, markDirty: false);
     _loaded = true;
     notifyListeners();
+  }
+
+  /// If app was killed without lifecycle (e.g. force-close), we may have a
+  /// foreground snapshot but no lastClosedAt in player data. Apply idle from it.
+  Future<void> _applyIdleFromForegroundSnapshotIfNeeded(SharedPreferences prefs, String dataKey) async {
+    if (_data.lastClosedAt != null) return;
+    final raw = prefs.getString(_foregroundSnapshotKey);
+    if (raw == null) return;
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      if ((map['dataKey'] as String?) != dataKey) return;
+      final closedStr = map['lastClosedAt'] as String?;
+      final closed = closedStr != null ? DateTime.tryParse(closedStr) : null;
+      if (closed == null) return;
+      final rateWith = (map['rateWithSession'] as num?)?.toDouble();
+      final rateWithout = (map['rateWithoutSession'] as num?)?.toDouble();
+      if (rateWith == null || rateWithout == null) return;
+      final sessionEndsAtStr = map['sessionEndsAt'] as String?;
+      final sessionEndsAt = sessionEndsAtStr != null ? DateTime.tryParse(sessionEndsAtStr) : null;
+      final now = DateTime.now();
+      final minutesAway = now.difference(closed).inMinutes.clamp(0, _maxIdleMinutes);
+      if (minutesAway <= 0) {
+        await prefs.remove(_foregroundSnapshotKey);
+        return;
+      }
+      double earned;
+      if (sessionEndsAt != null && sessionEndsAt.isAfter(closed)) {
+        final minSession = minutesAway.clamp(0, sessionEndsAt.difference(closed).inMinutes);
+        final minNormal = minutesAway - minSession;
+        earned = rateWith * minSession + rateWithout * minNormal;
+      } else {
+        earned = rateWithout * minutesAway;
+      }
+      if (earned > 0) {
+        _data = _data.copyWith(
+          btcBalance: _data.btcBalance + earned,
+          lifetimeMinedBtc: _data.lifetimeMinedBtc + earned,
+        );
+      }
+      await prefs.remove(_foregroundSnapshotKey);
+    } catch (_) {}
   }
 
   Future<DateTime?> _loadBoostExpiry() async {
@@ -236,10 +297,23 @@ class GameStateService extends ChangeNotifier {
     }
   }
 
-  Future<void> _persist({bool forceRemote = false, bool markDirty = true}) async {
+  /// Writes current state (including balance) to local storage only. Use to avoid losing progress if app is killed.
+  Future<void> persistLocalOnly() async {
+    await _persistLocalOnlyImpl();
+  }
+
+  /// Writes only to SharedPreferences (no Firebase). Use when app goes to
+  /// background so the save completes before the process may be killed.
+  Future<void> _persistLocalOnlyImpl() async {
     final prefs = await SharedPreferences.getInstance();
     final key = _userId != null ? '${_key}_$_userId' : _key;
     await prefs.setString(key, jsonEncode(_data.toJson()));
+  }
+
+  Future<void> _persist({bool forceRemote = false, bool markDirty = true}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _userId != null ? '${_key}_$_userId' : _key;
+    await prefs.setString(key, jsonEncode(_data.toJson())); // always write local first
 
     if (_userId != null) {
       if (markDirty) _remoteDirty = true;
@@ -271,14 +345,54 @@ class GameStateService extends ChangeNotifier {
     }
   }
 
+  /// Call when app goes to background. Saves lastClosedAt so mining continues
+  /// when you reopen (idle earnings applied on resume). Does only fast local
+  /// writes first so the process can finish before the OS kills it; Firebase
+  /// sync runs in the background.
   Future<void> saveAndClose() async {
-    _data = _data.copyWith(lastClosedAt: DateTime.now());
-    await _persist(forceRemote: true);
+    final closedAt = DateTime.now();
+    _data = _data.copyWith(lastClosedAt: closedAt);
+    final key = _userId != null ? '${_key}_$_userId' : _key;
+    // 1) Local-only save so lastClosedAt is on disk immediately (no Firebase wait).
+    await _persistLocalOnlyImpl();
+    // 2) Idle rates for background task (optional).
+    try {
+      await persistIdleRatesForBackground(
+        dataKey: key,
+        lastClosedAt: closedAt,
+        rateWithSession: _totalBtcPerMinWithSession(true),
+        rateWithoutSession: _totalBtcPerMinWithSession(false),
+        sessionEndsAt: _data.miningSessionEndsAt,
+      );
+    } catch (_) {}
+    // 3) Firebase sync in background; don't block so lifecycle callback returns fast.
+    if (_userId != null) {
+      _remoteDirty = true;
+      _persist(forceRemote: true).catchError((_) {});
+    }
   }
 
-  /// Sync current state to local storage and Firebase (without setting lastClosedAt).
+  /// Sync current state to local storage and Firebase so balance is never lost.
+  /// Call periodically (e.g. every few minutes) to keep cloud in sync.
   Future<void> syncToCloud() async {
-    await _persist(forceRemote: false, markDirty: false);
+    await _persist(forceRemote: true, markDirty: true);
+  }
+
+  /// Saves a snapshot of "last seen in foreground" so if the app is killed
+  /// without lifecycle (e.g. force-close), we can still apply idle on next open.
+  Future<void> saveForegroundSnapshot() async {
+    final key = _userId != null ? '${_key}_$_userId' : _key;
+    final prefs = await SharedPreferences.getInstance();
+    final map = <String, dynamic>{
+      'dataKey': key,
+      'lastClosedAt': DateTime.now().toIso8601String(),
+      'rateWithSession': _totalBtcPerMinWithSession(true),
+      'rateWithoutSession': _totalBtcPerMinWithSession(false),
+    };
+    if (_data.miningSessionEndsAt != null) {
+      map['sessionEndsAt'] = _data.miningSessionEndsAt!.toIso8601String();
+    }
+    await prefs.setString(_foregroundSnapshotKey, jsonEncode(map));
   }
 
   double rigCost(MiningRig rig) => rig.costBtc * (1 - _rigDiscount.clamp(0.0, 0.9));
