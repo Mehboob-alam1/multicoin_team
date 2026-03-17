@@ -2,22 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CLIENT_ID</key>
-	<string>1079258737071-qmmd7oacpij6c8km1pbdga6t4h8h7teq.apps.googleusercontent.com</string>
-	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.1079258737071-qmmd7oacpij6c8km1pbdga6t4h8h7teq</string>
 	<key>API_KEY</key>
-	<string>AIzaSyCVhfOeGUt7n9TLjaZ-NzgDBL5KPWI3i-4</string>
+	<string>AIzaSyB5yOJstU_GknolK-rT_8P4kcQbUxRXp60</string>
 	<key>GCM_SENDER_ID</key>
-	<string>1079258737071</string>
+	<string>656713014494</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>com.crypto.blockchain.mining.tycoon</string>
 	<key>PROJECT_ID</key>
-	<string>btcteam-a274d</string>
+	<string>multicoin-665b9</string>
 	<key>STORAGE_BUCKET</key>
-	<string>btcteam-a274d.firebasestorage.app</string>
+	<string>multicoin-665b9.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -29,8 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1079258737071:ios:08d27a1a70df88027aa75a</string>
-	<key>DATABASE_URL</key>
-	<string>https://btcteam-a274d-default-rtdb.firebaseio.com</string>
+	<string>1:656713014494:ios:b683d62c4455dde8f0f64f</string>
 </dict>
 </plist>

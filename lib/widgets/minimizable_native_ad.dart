@@ -6,16 +6,14 @@ import '../services/smart_ad_manager.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 class _D {
-  static const card     = Color(0xFF121826);
-  static const cardBord = Color(0xFF1E2A3A);
-  static const gold     = Color(0xFFF5A623);
-  static const textMid  = Color(0xFF8899BB);
-  static const textLow  = Color(0xFF3D4F6B);
+  static const card     = Color(0xFFFFFFFF);
+  static const cardBord = Color(0xFFE2E8F0);
+  static const gold     = Color(0xFFF59E0B);
+  static const textMid  = Color(0xFF6B7280);
+  static const textLow  = Color(0xFF9CA3AF);
 }
 
-/// Medium-size minimizable ad block.
-/// - Tries Native ad first (requires platform factoryId setup).
-/// - Falls back to medium rectangle banner (300×250) if native is unavailable.
+/// Native ad block only (no banner fallback). Requires platform native ad factory.
 class MinimizableNativeAd extends StatefulWidget {
   final String title;
   const MinimizableNativeAd({super.key, this.title = 'Sponsored'});
@@ -28,8 +26,7 @@ class _MinimizableNativeAdState extends State<MinimizableNativeAd>
     with SingleTickerProviderStateMixin {
   bool _minimized = false;
   bool _loading   = true;
-  NativeAd?      _nativeAd;
-  BannerHandle?  _fallbackBanner;
+  NativeAd? _nativeAd;
 
   late final AnimationController _expandCtrl = AnimationController(
     vsync: this,
@@ -51,20 +48,16 @@ class _MinimizableNativeAdState extends State<MinimizableNativeAd>
     final manager = context.read<SmartAdManager>();
     final native  = await manager.loadNative(factoryId: 'adFactoryMedium');
     if (!mounted) { native?.dispose(); return; }
-    if (native != null) {
-      setState(() { _nativeAd = native; _loading = false; });
-      return;
-    }
-    final banner = await manager.loadBanner(AdSize.mediumRectangle);
-    if (!mounted) { banner?.dispose(); return; }
-    setState(() { _fallbackBanner = banner; _loading = false; });
+    setState(() {
+      _nativeAd = native;
+      _loading = false;
+    });
   }
 
   @override
   void dispose() {
     _expandCtrl.dispose();
     _nativeAd?.dispose();
-    _fallbackBanner?.dispose();
     super.dispose();
   }
 
@@ -79,8 +72,8 @@ class _MinimizableNativeAdState extends State<MinimizableNativeAd>
 
   @override
   Widget build(BuildContext context) {
-    // Nothing to show yet
-    if (!_loading && _nativeAd == null && _fallbackBanner == null) {
+    // Only show when we have a native ad (no banner fallback)
+    if (!_loading && _nativeAd == null) {
       return const SizedBox.shrink();
     }
 
@@ -153,17 +146,19 @@ class _MinimizableNativeAdState extends State<MinimizableNativeAd>
           // ── Divider ────────────────────────────────────────────────────────
           Container(height: 1, color: _D.cardBord),
 
-          // ── Ad body (animated collapse) ────────────────────────────────────
+          // ── Native ad body only (animated collapse) ───────────────────────
           SizeTransition(
             sizeFactor: _expandAnim,
             axisAlignment: -1,
             child: _loading
                 ? _LoadingPlaceholder()
-                : SizedBox(
-              width: 300,
-              height: 250,
-              child: AdWidget(ad: _nativeAd ?? _fallbackBanner!.ad),
-            ),
+                : _nativeAd != null
+                    ? SizedBox(
+                        width: double.infinity,
+                        height: 250,
+                        child: AdWidget(ad: _nativeAd!),
+                      )
+                    : const SizedBox.shrink(),
           ),
         ],
       ),

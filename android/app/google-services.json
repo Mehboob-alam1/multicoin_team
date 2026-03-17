@@ -1,44 +1,26 @@
 {
   "project_info": {
-    "project_number": "1079258737071",
-    "firebase_url": "https://btcteam-a274d-default-rtdb.firebaseio.com",
-    "project_id": "btcteam-a274d",
-    "storage_bucket": "btcteam-a274d.firebasestorage.app"
+    "project_number": "656713014494",
+    "project_id": "multicoin-665b9",
+    "storage_bucket": "multicoin-665b9.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1079258737071:android:9e8de2b17e9084c37aa75a",
+        "mobilesdk_app_id": "1:656713014494:android:287089263ba1e69bf0f64f",
         "android_client_info": {
           "package_name": "com.crypto.blockchain.mining.tycoon"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "1079258737071-55761c3o6tcl9og6rinqjsbv3m4dig0u.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAE2K8dZf4jLAB7BgLLY5SCKCSyOJFv1kE"
+          "current_key": "AIzaSyBWxRAISEvlBK2_P47aEyI51xQpZxSPoIM"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "1079258737071-55761c3o6tcl9og6rinqjsbv3m4dig0u.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "1079258737071-1vo0oi19h2tagd7okrb5p5p565k66b3d.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.example.btcSim"
-              }
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

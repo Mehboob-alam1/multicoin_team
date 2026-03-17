@@ -149,9 +149,9 @@ class _LuckySpinScreenState extends State<LuckySpinScreen>
         child: Column(
           children: [
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Spin to win BTC, boosts, or rigs!',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
             ),
             const SizedBox(height: 32),
             SizedBox(
@@ -249,7 +249,7 @@ class _WheelPainter extends CustomPainter {
         paint,
       );
       final borderPaint = Paint()
-        ..color = Colors.white24
+        ..color = Colors.black12
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2;
       canvas.drawArc(
@@ -314,7 +314,7 @@ class _PointerPainter extends CustomPainter {
       ..close();
     canvas.drawPath(path, paint);
     final border = Paint()
-      ..color = Colors.white24
+      ..color = Colors.black12
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
     canvas.drawPath(path, border);

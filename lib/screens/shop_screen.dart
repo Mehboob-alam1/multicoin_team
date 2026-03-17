@@ -14,20 +14,20 @@ import '../widgets/minimizable_native_ad.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 class _D {
-  static const bg       = Color(0xFF080B12);
-  static const surface  = Color(0xFF0E1420);
-  static const card     = Color(0xFF121826);
-  static const cardBord = Color(0xFF1E2A3A);
-  static const gold     = Color(0xFFF5A623);
-  static const goldDark = Color(0xFFE08800);
-  static const electric = Color(0xFF00D4FF);
-  static const green    = Color(0xFF00E5A0);
-  static const purple   = Color(0xFFB06EFF);
-  static const pink     = Color(0xFFFF6B9D);
-  static const orange   = Color(0xFFFF9A3C);
-  static const textHi   = Color(0xFFF0F4FF);
-  static const textMid  = Color(0xFF8899BB);
-  static const textLow  = Color(0xFF3D4F6B);
+  static const bg       = Color(0xFFF7F8FA);
+  static const surface  = Color(0xFFFFFFFF);
+  static const card     = Color(0xFFFFFFFF);
+  static const cardBord = Color(0xFFE2E8F0);
+  static const gold     = Color(0xFFF59E0B);
+  static const goldDark = Color(0xFFD97706);
+  static const electric = Color(0xFF0EA5E9);
+  static const green    = Color(0xFF22C55E);
+  static const purple   = Color(0xFFA855F7);
+  static const pink     = Color(0xFFEC4899);
+  static const orange   = Color(0xFFF97316);
+  static const textHi   = Color(0xFF0D0F12);
+  static const textMid  = Color(0xFF6B7280);
+  static const textLow  = Color(0xFF9CA3AF);
 }
 
 // ─── Rig metadata ─────────────────────────────────────────────────────────────

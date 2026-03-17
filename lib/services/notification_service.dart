@@ -11,7 +11,7 @@ class NotificationService extends ChangeNotifier {
   String? get token => _token;
 
   static const _channelId = 'btc_sim_channel';
-  static const _channelName = 'Bitcoin Mining';
+  static const _channelName = 'Crypto Mining Tycoon';
 
   final FlutterLocalNotificationsPlugin _local = FlutterLocalNotificationsPlugin();
   bool _localInitialized = false;

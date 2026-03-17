@@ -40,22 +40,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAE2K8dZf4jLAB7BgLLY5SCKCSyOJFv1kE',
-    appId: '1:1079258737071:android:9e8de2b17e9084c37aa75a',
-    messagingSenderId: '1079258737071',
-    projectId: 'btcteam-a274d',
-    databaseURL: 'https://btcteam-a274d-default-rtdb.firebaseio.com',
-    storageBucket: 'btcteam-a274d.firebasestorage.app',
+    apiKey: 'AIzaSyBWxRAISEvlBK2_P47aEyI51xQpZxSPoIM',
+    appId: '1:656713014494:android:287089263ba1e69bf0f64f',
+    messagingSenderId: '656713014494',
+    projectId: 'multicoin-665b9',
+    storageBucket: 'multicoin-665b9.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCVhfOeGUt7n9TLjaZ-NzgDBL5KPWI3i-4',
-    appId: '1:1079258737071:ios:08d27a1a70df88027aa75a',
-    messagingSenderId: '1079258737071',
-    projectId: 'btcteam-a274d',
-    databaseURL: 'https://btcteam-a274d-default-rtdb.firebaseio.com',
-    storageBucket: 'btcteam-a274d.firebasestorage.app',
-    iosClientId: '1079258737071-qmmd7oacpij6c8km1pbdga6t4h8h7teq.apps.googleusercontent.com',
+    apiKey: 'AIzaSyB5yOJstU_GknolK-rT_8P4kcQbUxRXp60',
+    appId: '1:656713014494:ios:b683d62c4455dde8f0f64f',
+    messagingSenderId: '656713014494',
+    projectId: 'multicoin-665b9',
+    storageBucket: 'multicoin-665b9.firebasestorage.app',
     iosBundleId: 'com.crypto.blockchain.mining.tycoon',
   );
 

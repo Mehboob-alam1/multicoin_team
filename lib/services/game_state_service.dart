@@ -40,6 +40,7 @@ class GameStateService extends ChangeNotifier {
   double _rigDiscount = 0.0;
 
   bool get isLoaded => _loaded;
+  String get displayName => _displayName;
   PlayerData get data => _data;
   /// Primary currency balance (BTC). From [coinBalances] or legacy [btcBalance].
   double get btcBalance => _data.coinBalances[Coins.primaryId] ?? _data.btcBalance;
@@ -50,6 +51,8 @@ class GameStateService extends ChangeNotifier {
   double lifetimeMined(String coinId) => _data.lifetimeMinedByCoin[coinId] ?? 0;
   /// Total mining rate (coins per min) for a specific coin.
   double totalRatePerCoin(String coinId) => _totalRatePerCoinWithSession(coinId, isSessionActive);
+  /// Coin IDs the user has chosen to mine. Only these receive mining output each tick.
+  List<String> get selectedMiningCoinIds => List.unmodifiable(_data.selectedMiningCoinIds.isEmpty ? PlayerData.defaultMiningCoinIds : _data.selectedMiningCoinIds);
   bool get syncInProgress => _syncInProgress;
   String? get lastSyncError => _lastSyncError;
   List<String> get purchasedOneTimeIds => List.unmodifiable(_purchasedOneTimeIds);
@@ -131,6 +134,12 @@ class GameStateService extends ChangeNotifier {
     if (_purchasedOneTimeIds.contains('starter_pack')) m *= 1.05;
     if (_purchasedOneTimeIds.contains('satoshi_pack')) m *= 1.03;
     if (_purchasedOneTimeIds.contains('mega_pack')) m *= 1.15;
+    if (_purchasedOneTimeIds.contains('hash_booster_20')) m *= 1.06;
+    if (_purchasedOneTimeIds.contains('power_pack_30')) m *= 1.08;
+    if (_purchasedOneTimeIds.contains('pro_upgrade_50')) m *= 1.12;
+    if (_purchasedOneTimeIds.contains('elite_bundle_100')) m *= 1.18;
+    if (_purchasedOneTimeIds.contains('tycoon_kit_150')) m *= 1.22;
+    if (_purchasedOneTimeIds.contains('ultimate_pack_200')) m *= 1.25;
     return m;
   }
 
@@ -157,6 +166,16 @@ class GameStateService extends ChangeNotifier {
   void setDisplayName(String? name) {
     if (name != null && name.isNotEmpty) _displayName = name;
   }
+
+  /// Set which coins the user wants to mine. App is BTC-only; only [Coins.primaryId] is used.
+  Future<void> setSelectedMiningCoins(List<String> coinIds) async {
+    _data = _data.copyWith(selectedMiningCoinIds: [Coins.primaryId]);
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Whether a coin is currently selected for mining.
+  bool isMiningCoin(String coinId) => selectedMiningCoinIds.contains(coinId);
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -692,10 +711,11 @@ class GameStateService extends ChangeNotifier {
     if (_lastTick != null) {
       final diff = now.difference(_lastTick!);
       final mins = diff.inMilliseconds / 60000;
-      for (final coin in Coins.all) {
-        final rate = _totalRatePerCoinWithSession(coin.id, isSessionActive);
+      final toMine = selectedMiningCoinIds;
+      for (final coinId in toMine) {
+        final rate = _totalRatePerCoinWithSession(coinId, isSessionActive);
         final earned = rate * mins;
-        if (earned > 0) _data = _addMinedToCoin(_data, coin.id, earned);
+        if (earned > 0) _data = _addMinedToCoin(_data, coinId, earned);
       }
     }
     _lastTick = now;

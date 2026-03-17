@@ -7,12 +7,19 @@ Use the Product ID exactly as shown. Names and descriptions can match or be adap
 
 ONE-TIME PRODUCTS (In-app products)
 -----------------------------------
-Name                  Description                          Product ID      Price
-Starter Pack          Small BTC + 1 GPU rig                starter_pack   $1.99
-Satoshi Pack          ~2 days mining worth                 satoshi_pack   $4.99
-Mega Pack             Larger BTC + Mining rack             mega_pack       $9.99
-2x Boost (1 hour)     Double mining rate for 1 hour        boost_2x_1h     $0.99
-Season Pass           Unlock premium season rewards         season_pass     $2.99
+Name                    Description                              Product ID            Price
+Starter Pack            Small BTC + 1 GPU rig                    starter_pack           $1.99
+Satoshi Pack            ~2 days mining worth                     satoshi_pack           $4.99
+Mega Pack               Larger BTC + Mining rack                  mega_pack              $9.99
+2x Boost (1 hour)       Double mining rate for 1 hour            boost_2x_1h             $0.99
+Season Pass              Unlock premium season rewards           season_pass             $2.99
+
+Hash Booster             Permanent +6% mining rate               hash_booster_20        $19.99
+Power Miner Pack         Permanent +8% mining + 0.0003 BTC       power_pack_30          $29.99
+Pro Mining Upgrade       Permanent +12% mining + 0.0008 BTC      pro_upgrade_50         $49.99
+Elite Hash Bundle        Permanent +18% mining + 0.002 BTC       elite_bundle_100       $99.99
+Tycoon Mining Kit        Permanent +22% mining + 0.004 BTC       tycoon_kit_150         $149.99
+Ultimate Miner Pack      Permanent +25% mining + 0.006 BTC       ultimate_pack_200      $199.00
 
 
 SUBSCRIPTIONS
@@ -24,5 +31,5 @@ Premium Yearly        Best value — save 50%                premium_yearly    $
 
 COPY-PASTE PRODUCT IDS
 -----------------------
-In-app products:  starter_pack, satoshi_pack, mega_pack, boost_2x_1h, season_pass
+In-app products:  starter_pack, satoshi_pack, mega_pack, boost_2x_1h, season_pass, hash_booster_20, power_pack_30, pro_upgrade_50, elite_bundle_100, tycoon_kit_150, ultimate_pack_200
 Subscriptions:    premium_monthly, premium_yearly

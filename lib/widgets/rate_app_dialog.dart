@@ -8,11 +8,11 @@ import '../services/rate_app_service.dart';
 
 /// 5-star feedback dialog shown randomly to ask users to rate the app.
 class RateAppDialog {
-  static const _gold = Color(0xFFF5A623);
-  static const _textHi = Color(0xFFF0F4FF);
-  static const _textMid = Color(0xFF8899BB);
-  static const _card = Color(0xFF121826);
-  static const _cardBord = Color(0xFF1E2A3A);
+  static const _gold = Color(0xFFF59E0B);
+  static const _textHi = Color(0xFF0D0F12);
+  static const _textMid = Color(0xFF6B7280);
+  static const _card = Color(0xFFFFFFFF);
+  static const _cardBord = Color(0xFFE2E8F0);
 
   static Future<void> show(BuildContext context) async {
     final rateService = context.read<RateAppService>();
@@ -45,7 +45,7 @@ class RateAppDialog {
                   Icon(Icons.currency_bitcoin_rounded, color: _gold, size: 48),
                   const SizedBox(height: 16),
                   const Text(
-                    'Enjoying Bitcoin Mining?',
+                    'Enjoying Crypto Mining Tycoon?',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: _textHi,
@@ -84,7 +84,7 @@ class RateAppDialog {
                           label: const Text('Rate 5 stars'),
                           style: FilledButton.styleFrom(
                             backgroundColor: _gold,
-                            foregroundColor: Colors.black,
+                            foregroundColor: Colors.white,
                           ),
                         ),
                       ),

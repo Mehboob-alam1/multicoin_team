@@ -49,15 +49,15 @@ void main() async {
       MaterialApp(
         theme: ThemeData.dark(),
         home: Scaffold(
-          body: Center(
+      body: Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.warning_amber_rounded, size: 64, color: Colors.orange),
                   const SizedBox(height: 16),
-                  Text(
+            Text(
                     'Configure Firebase',
                     style: ThemeData.dark().textTheme.headlineSmall,
                   ),

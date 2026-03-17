@@ -16,6 +16,11 @@ class PlayerData {
   final int totalSessionsStarted;
   final List<String> claimedMilestones;
   final DateTime? lastClosedAt;
+  /// Coin IDs the user chose to mine. Only these receive mining output. App is BTC-only.
+  final List<String> selectedMiningCoinIds;
+
+  /// Only BTC is mined.
+  static const List<String> defaultMiningCoinIds = ['btc'];
 
   const PlayerData({
     this.btcBalance = 0,
@@ -30,6 +35,7 @@ class PlayerData {
     this.totalSessionsStarted = 0,
     this.claimedMilestones = const [],
     this.lastClosedAt,
+    this.selectedMiningCoinIds = defaultMiningCoinIds,
   });
 
   PlayerData copyWith({
@@ -45,6 +51,7 @@ class PlayerData {
     int? totalSessionsStarted,
     List<String>? claimedMilestones,
     Object? lastClosedAt = _unset,
+    List<String>? selectedMiningCoinIds,
   }) {
     return PlayerData(
       btcBalance: btcBalance ?? this.btcBalance,
@@ -63,6 +70,7 @@ class PlayerData {
       lastClosedAt: identical(lastClosedAt, _unset)
           ? this.lastClosedAt
           : lastClosedAt as DateTime?,
+      selectedMiningCoinIds: selectedMiningCoinIds ?? this.selectedMiningCoinIds,
     );
   }
 
@@ -79,6 +87,7 @@ class PlayerData {
         'totalSessionsStarted': totalSessionsStarted,
         'claimedMilestones': claimedMilestones,
         'lastClosedAt': lastClosedAt?.toIso8601String(),
+        'selectedMiningCoinIds': selectedMiningCoinIds,
       };
 
   static PlayerData fromJson(Map<String, dynamic> json) {
@@ -99,6 +108,7 @@ class PlayerData {
       }
     }
     if (lifeByCoin.isEmpty && lifeBtc > 0) lifeByCoin['btc'] = lifeBtc;
+    List<String> selectedCoins = List.from(PlayerData.defaultMiningCoinIds);
     return PlayerData(
       btcBalance: btcBal,
       coinBalances: coins,
@@ -118,6 +128,7 @@ class PlayerData {
       lastClosedAt: json['lastClosedAt'] != null
           ? DateTime.tryParse(json['lastClosedAt'] as String)
           : null,
+      selectedMiningCoinIds: selectedCoins,
     );
   }
 }

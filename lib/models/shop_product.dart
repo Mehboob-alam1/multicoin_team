@@ -84,6 +84,54 @@ class ShopProducts {
       price: '\$2.99',
       icon: '🏆',
     ),
+    // ─── Premium one-time mining items (all under $200) ─────────────────────
+    OneTimeProduct(
+      id: 'hash_booster_20',
+      name: 'Hash Booster',
+      description: 'Permanent +6% mining rate',
+      price: '\$19.99',
+      icon: '🔧',
+    ),
+    OneTimeProduct(
+      id: 'power_pack_30',
+      name: 'Power Miner Pack',
+      description: 'Permanent +8% mining rate + 0.0003 BTC',
+      price: '\$29.99',
+      btcAmount: 0.0003,
+      icon: '⚡',
+    ),
+    OneTimeProduct(
+      id: 'pro_upgrade_50',
+      name: 'Pro Mining Upgrade',
+      description: 'Permanent +12% mining rate + 0.0008 BTC',
+      price: '\$49.99',
+      btcAmount: 0.0008,
+      icon: '💎',
+    ),
+    OneTimeProduct(
+      id: 'elite_bundle_100',
+      name: 'Elite Hash Bundle',
+      description: 'Permanent +18% mining rate + 0.002 BTC',
+      price: '\$99.99',
+      btcAmount: 0.002,
+      icon: '🏆',
+    ),
+    OneTimeProduct(
+      id: 'tycoon_kit_150',
+      name: 'Tycoon Mining Kit',
+      description: 'Permanent +22% mining rate + 0.004 BTC',
+      price: '\$149.99',
+      btcAmount: 0.004,
+      icon: '👑',
+    ),
+    OneTimeProduct(
+      id: 'ultimate_pack_200',
+      name: 'Ultimate Miner Pack',
+      description: 'Permanent +25% mining rate + 0.006 BTC',
+      price: '\$199.00',
+      btcAmount: 0.006,
+      icon: '🌟',
+    ),
   ];
 
   static const premiumPlans = [

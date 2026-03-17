@@ -36,6 +36,8 @@ import 'screens/profile_screen.dart';
 import 'screens/lucky_spin_screen.dart';
 import 'screens/news_screen.dart';
 import 'screens/mini_game_screen.dart';
+import 'screens/mining_farm_screen.dart';
+import 'screens/shop_screen.dart';
 
 class BtcSimApp extends StatelessWidget {
   const BtcSimApp({super.key});
@@ -74,8 +76,8 @@ class BtcSimApp extends StatelessWidget {
         ChangeNotifierProvider(create: (ctx) => GameStateService(ctx.read<FirebaseSyncService>())),
       ],
       child: MaterialApp(
-        title: 'Bitcoin Mining',
-        theme: AppTheme.dark,
+        title: 'Crypto Mining Tycoon',
+        theme: AppTheme.light,
         debugShowCheckedModeBanner: false,
         initialRoute: '/',
         routes: {
@@ -87,6 +89,8 @@ class BtcSimApp extends StatelessWidget {
           '/lucky-spin': (ctx) => const LuckySpinScreen(),
           '/news': (ctx) => const NewsScreen(),
           '/mini-game': (ctx) => const MiniGameScreen(),
+          '/farm': (ctx) => const MiningFarmScreen(),
+          '/shop': (ctx) => const ShopScreen(),
         },
       ),
     );

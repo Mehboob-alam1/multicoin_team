@@ -6,9 +6,9 @@ import '../services/smart_ad_manager.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 class _D {
-  static const card     = Color(0xFF121826);
-  static const cardBord = Color(0xFF1E2A3A);
-  static const textLow  = Color(0xFF3D4F6B);
+  static const card     = Color(0xFFFFFFFF);
+  static const cardBord = Color(0xFFE2E8F0);
+  static const textLow  = Color(0xFF9CA3AF);
 }
 
 class SmartBannerAd extends StatefulWidget {

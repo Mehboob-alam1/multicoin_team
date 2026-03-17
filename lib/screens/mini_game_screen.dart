@@ -62,10 +62,10 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
     final mini = context.watch<MiniGameService>();
     final game = context.watch<GameStateService>();
     return Scaffold(
-      backgroundColor: const Color(0xFF080B12),
+      backgroundColor: AppTheme.surface,
       appBar: AppBar(
         title: const Text('Tap challenge'),
-        backgroundColor: const Color(0xFF0E1420),
+        backgroundColor: AppTheme.surface,
       ),
       body: SafeArea(
         child: Padding(
@@ -74,13 +74,13 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
             children: [
               Text(
                 'Tap the coin ${MiniGameService.tapTarget} times in ${MiniGameService.tapTimeSec} seconds!',
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 'Plays left today: ${mini.playsLeft}',
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
+                style: TextStyle(color: AppTheme.textSecondary.withValues(alpha: 0.8), fontSize: 12),
               ),
               const Spacer(),
               if (!_playing && !_finished)
@@ -108,7 +108,7 @@ class _MiniGameScreenState extends State<MiniGameScreen> {
                 ),
                 Text(
                   '${(MiniGameService.tapTimeSec - _elapsedMs / 1000).ceil()}s',
-                  style: const TextStyle(color: Colors.white54, fontSize: 18),
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 18),
                 ),
                 const SizedBox(height: 24),
                 GestureDetector(
