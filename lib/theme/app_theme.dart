@@ -15,6 +15,25 @@ class AppTheme {
   static const Color textSecondary = Color(0xFF6B7280);
   static const Color border = Color(0xFFE2E8F0);
 
+  /// Layout: use for consistent, flexible spacing across the app.
+  static const double pagePaddingH = 20;
+  static const double pagePaddingV = 16;
+  static const double sectionSpacing = 20;
+  static const double cardSpacing = 12;
+  static const double cardRadius = 16;
+  static const double bottomNavHeight = 76;
+  /// Bottom padding for scroll content when floating nav is visible (nav + safe area handled in shell).
+  static double pageBottomPadding(BuildContext context) =>
+      bottomNavHeight + MediaQuery.of(context).padding.bottom + 8;
+  static EdgeInsets pagePadding(BuildContext context) => EdgeInsets.fromLTRB(
+    pagePaddingH,
+    pagePaddingV,
+    pagePaddingH,
+    pageBottomPadding(context),
+  );
+  static EdgeInsets pagePaddingNoBottom(BuildContext context) =>
+      EdgeInsets.fromLTRB(pagePaddingH, pagePaddingV, pagePaddingH, pagePaddingV);
+
   static TextTheme get lightTextTheme =>
       GoogleFonts.spaceGroteskTextTheme(ThemeData.light().textTheme);
   /// Alias for light theme (app uses whitish theme everywhere).
@@ -56,8 +75,10 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: cardBg,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(cardRadius)),
         margin: EdgeInsets.zero,
+        shadowColor: Colors.black.withValues(alpha: 0.06),
+        clipBehavior: Clip.antiAlias,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(

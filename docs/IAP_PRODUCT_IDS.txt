@@ -1,0 +1,119 @@
+BTC_SIM — IN-APP PURCHASE PRODUCT IDS AND CATALOG PRICES (USD)
+================================================================
+Product IDs must match Google Play Console and App Store Connect exactly.
+Prices below mirror lib/models/shop_product.dart (in-app catalog). The store
+may show localized currency; set the same base price tier in Play / App Store.
+
+Currency reference: USD ($)
+
+
+--------------------------------------------------------------------------------
+1) FARM RIGS — product ID, price, in-game rig ID
+--------------------------------------------------------------------------------
+(Repeatable / consumable SKUs on Mining Farm; each purchase adds one rig.)
+
+  PRODUCT ID                 PRICE      RIG ID (game)
+  ------------------------   -------    ------------------
+  laptop_rig                 $0.99      laptop
+  rig_gpu                    $2.99      gpu_rig
+  rig_rack                   $9.99      mining_rack
+  warehouse_farm_rig         $19.99     warehouse_farm
+  mega_facility_rig          $49.99     mega_facility
+  cpu_miner_rig              $0.99      cpu_miner
+  gaming_gpu_rig_iap         $2.99      gaming_gpu_rig
+  gpu_cluster_rig            $9.99      gpu_cluster
+  asic_btc_rig               $19.99     asic_btc
+  data_center_rig_iap        $49.99     data_center_rig
+
+
+--------------------------------------------------------------------------------
+2) SHOP — OTHER ONE-TIME PRODUCTS (non-subscription)
+--------------------------------------------------------------------------------
+
+  PRODUCT ID                 PRICE      NOTES (short)
+  ------------------------   -------    ------------------------------------------
+  starter_pack               $1.99      Starter Pack — BTC + gpu_rig grant in logic
+  satoshi_pack               $4.99      Satoshi Pack — BTC
+  mega_pack                  $9.99      Mega Pack — BTC + mining_rack grant in logic
+  boost_2x_1h                $0.99      2x mining 1 hour
+  season_pass                $2.99      Season Pass
+  hash_booster_20            $19.99     Permanent mining mult (+6% in game logic)
+  power_pack_30              $29.99     + BTC bundle (see code)
+  pro_upgrade_50             $49.99     + BTC bundle (see code)
+  elite_bundle_100           $99.99     + BTC bundle (see code)
+  tycoon_kit_150             $149.99    + BTC bundle (see code)
+  ultimate_pack_200          $199.00    + BTC bundle (see code)
+
+
+--------------------------------------------------------------------------------
+3) SUBSCRIPTION PLANS (PREMIUM)
+--------------------------------------------------------------------------------
+
+  PRODUCT ID                 PRICE        BILLING PERIOD (app)
+  ------------------------   ----------   --------------------
+  premium_monthly            $4.99        per month (30 days in app)
+  premium_yearly             $29.99       per year (365 days in app)
+
+
+--------------------------------------------------------------------------------
+4) QUICK COPY — PRODUCT IDS ONLY (one-time, all)
+--------------------------------------------------------------------------------
+starter_pack
+satoshi_pack
+mega_pack
+boost_2x_1h
+season_pass
+laptop_rig
+rig_gpu
+rig_rack
+warehouse_farm_rig
+mega_facility_rig
+cpu_miner_rig
+gaming_gpu_rig_iap
+gpu_cluster_rig
+asic_btc_rig
+data_center_rig_iap
+hash_booster_20
+power_pack_30
+pro_upgrade_50
+elite_bundle_100
+tycoon_kit_150
+ultimate_pack_200
+
+
+--------------------------------------------------------------------------------
+5) QUICK COPY — SUBSCRIPTION IDS ONLY
+--------------------------------------------------------------------------------
+premium_monthly
+premium_yearly
+
+
+--------------------------------------------------------------------------------
+6) PRICE + ID — SORTED BY PRICE (USD, for spreadsheets)
+--------------------------------------------------------------------------------
+$0.99     boost_2x_1h
+$0.99     cpu_miner_rig
+$0.99     laptop_rig
+$1.99     starter_pack
+$2.99     gaming_gpu_rig_iap
+$2.99     rig_gpu
+$2.99     season_pass
+$4.99     premium_monthly
+$4.99     satoshi_pack
+$9.99     gpu_cluster_rig
+$9.99     mega_pack
+$9.99     rig_rack
+$19.99    asic_btc_rig
+$19.99    hash_booster_20
+$19.99    warehouse_farm_rig
+$29.99    power_pack_30
+$29.99    premium_yearly
+$49.99    data_center_rig_iap
+$49.99    mega_facility_rig
+$49.99    pro_upgrade_50
+$99.99    elite_bundle_100
+$149.99   tycoon_kit_150
+$199.00   ultimate_pack_200
+
+
+END OF FILE

@@ -3,9 +3,12 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../config/mining_economy.dart';
 import '../models/mining_rig.dart';
+import '../models/shop_product.dart';
 import '../services/ad_remote_config_service.dart';
 import '../services/game_state_service.dart';
+import '../services/iap_service.dart';
 import '../widgets/minimizable_native_ad.dart';
 import '../theme/app_theme.dart';
 import '../widgets/smart_banner_ad.dart';
@@ -40,8 +43,233 @@ _RigMeta _metaForRig(String id) => switch (id) {
   'mining_rack'     => const _RigMeta(Icons.view_module_rounded,   _D.electric,       'Tier III'),
   'warehouse_farm'  => const _RigMeta(Icons.warehouse_rounded,     _D.gold,           'Tier IV'),
   'mega_facility'   => const _RigMeta(Icons.auto_awesome_rounded,  Color(0xFFB06EFF), 'Tier V'),
+  'cpu_miner'       => const _RigMeta(Icons.memory_rounded,        Color(0xFF8899BB), 'Tier I'),
+  'gaming_gpu_rig'  => const _RigMeta(Icons.sports_esports_rounded, _D.green,       'Tier II'),
+  'gpu_cluster'     => const _RigMeta(Icons.hub_rounded,           _D.electric,       'Tier III'),
+  'asic_btc'        => const _RigMeta(Icons.flash_on_rounded,      _D.gold,           'Tier IV'),
+  'data_center_rig' => const _RigMeta(Icons.dns_rounded,           Color(0xFFB06EFF), 'Tier V'),
   _                 => const _RigMeta(Icons.hardware_rounded,      _D.textMid,        ''),
 };
+
+String _formatMiningRateLine(String coinId, double rate) {
+  final sym = coinId.toUpperCase();
+  if (rate == 0) return '$sym —';
+  if (rate.abs() < 1e-7) return '$sym ${rate.toStringAsExponential(2)}/min';
+  if (rate < 0.01) return '$sym ${rate.toStringAsFixed(8)}/min';
+  return '$sym ${rate.toStringAsFixed(6)}/min';
+}
+
+/// Bottom sheet: perks when buying this rig (tap card on Mining Farm).
+void _showRigPerksSheet(
+  BuildContext context, {
+  required MiningRig rig,
+  required _RigMeta meta,
+  required int count,
+  required bool isFull,
+  required String? priceStrUsd,
+  required bool storeHasLivePrice,
+  required bool billingReady,
+  required bool iapLoading,
+  required VoidCallback? onBuyWithUsd,
+  required double farmMiningMultiplier,
+  OneTimeProduct? shopProduct,
+}) {
+  final perks = <String>[
+    'Adds 1× this rig to your farm permanently (you can own many of the same type).',
+    'Your farm tier multiplies all rigs — currently ×${farmMiningMultiplier.toStringAsFixed(2)} mining.',
+    if (rig.supportedCoins.length <= 1 || rig.ratePerCoin.isEmpty)
+      'Base output: ${_formatMiningRateLine('btc', rig.btcPerMin * MiningEconomy.outputScale)}'
+    else
+      'Multi-coin base rates (before farm multiplier):',
+    ...() {
+      if (rig.ratePerCoin.isEmpty) return <String>[];
+      return rig.supportedCoins
+          .map((c) => _formatMiningRateLine(c, rig.rateForCoin(c) * MiningEconomy.outputScale))
+          .toList();
+    }(),
+    'Power draw ${rig.powerConsumption.toStringAsFixed(1)} · Heat ${rig.heatGeneration.toStringAsFixed(1)} (energy & cooling).',
+    if (rig.upgradeLevels > 0)
+      'This rig type can reach up to ${rig.upgradeLevels} upgrade levels over time.',
+  ];
+
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: _D.card,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (ctx) {
+      final bottom = MediaQuery.paddingOf(ctx).bottom + AppTheme.pageBottomPadding(ctx);
+      return Padding(
+        padding: EdgeInsets.fromLTRB(AppTheme.pagePaddingH, 12, AppTheme.pagePaddingH, bottom),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: _D.cardBord,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: meta.accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: meta.accent.withValues(alpha: 0.3)),
+                    ),
+                    child: Icon(meta.icon, color: meta.accent, size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          rig.name,
+                          style: const TextStyle(
+                            color: _D.textHi,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                            fontFamily: AppTheme.fontFamily,
+                          ),
+                        ),
+                        if (meta.tier.isNotEmpty)
+                          Text(
+                            meta.tier,
+                            style: TextStyle(color: meta.accent, fontWeight: FontWeight.w700, fontSize: 12),
+                          ),
+                        if (count > 0)
+                          Text(
+                            'You already own ×$count',
+                            style: const TextStyle(color: _D.textMid, fontSize: 12),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if ((shopProduct?.description ?? '').isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  shopProduct!.description,
+                  style: const TextStyle(color: _D.textMid, fontSize: 13, height: 1.35),
+                ),
+              ],
+              const SizedBox(height: 16),
+              const Text(
+                'What you get',
+                style: TextStyle(
+                  color: _D.textHi,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 10),
+              ...perks.map(
+                (line) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Icon(Icons.check_circle_rounded, size: 16, color: _D.green),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          line,
+                          style: const TextStyle(color: _D.textMid, fontSize: 13, height: 1.35),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (priceStrUsd != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  storeHasLivePrice ? 'Price (Google Play)' : 'Estimated price',
+                  style: const TextStyle(color: _D.textLow, fontSize: 11),
+                ),
+                Text(
+                  priceStrUsd.startsWith('\$') ? priceStrUsd : '\$$priceStrUsd',
+                  style: const TextStyle(
+                    color: _D.green,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 20,
+                    fontFamily: AppTheme.fontFamily,
+                  ),
+                ),
+              ],
+              if (isFull)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Farm is at capacity — upgrade farm tier to add more rigs.',
+                    style: TextStyle(color: _D.orange.withValues(alpha: 0.9), fontSize: 12),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              if (onBuyWithUsd != null && !isFull)
+                FilledButton.icon(
+                  onPressed: iapLoading
+                      ? null
+                      : () {
+                          Navigator.of(ctx).pop();
+                          onBuyWithUsd();
+                        },
+                  icon: iapLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.shopping_cart_outlined, size: 20),
+                  label: Text(
+                    priceStrUsd == null
+                        ? 'Buy with Google Play'
+                        : 'Buy ${priceStrUsd.startsWith(r'$') ? priceStrUsd : '${r'$'}$priceStrUsd'}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _D.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                )
+              else if (!billingReady && !isFull && priceStrUsd != null)
+                Text(
+                  'Billing unavailable — check Google Play on this device.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: _D.textLow, fontSize: 12),
+                ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 class MiningFarmScreen extends StatelessWidget {
@@ -50,6 +278,7 @@ class MiningFarmScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final game  = context.watch<GameStateService>();
+    final iap   = context.watch<IapService>();
     final adCfg = context.watch<AdRemoteConfigService>();
 
     final counts = <String, int>{};
@@ -108,7 +337,7 @@ class MiningFarmScreen extends StatelessWidget {
                   ),
 
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                    padding: EdgeInsets.fromLTRB(AppTheme.pagePaddingH, 8, AppTheme.pagePaddingH, AppTheme.pageBottomPadding(context)),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
 
@@ -128,41 +357,80 @@ class MiningFarmScreen extends StatelessWidget {
 
                         // ── Section label ──────────────────────────────
                         const Padding(
-                          padding: EdgeInsets.only(bottom: 12),
-                          child: Row(children: [
-                            Text(
-                              'AVAILABLE RIGS',
-                              style: TextStyle(
-                                color: _D.textMid,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 2,
+                          padding: EdgeInsets.only(bottom: 4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'AVAILABLE RIGS',
+                                style: TextStyle(
+                                  color: _D.textMid,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 2,
+                                ),
                               ),
-                            ),
-                          ]),
+                              SizedBox(height: 4),
+                              Text(
+                                'Buy rigs here with USD (Google Play). Prices update when the store loads.',
+                                style: TextStyle(color: _D.textLow, fontSize: 11),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(height: 12),
 
-                        // ── Rig cards ──────────────────────────────────
+                        // ── Rig cards (IAP USD only — no BTC) ─────────
                         ...MiningRigs.all.map((rig) {
-                          final count  = counts[rig.id] ?? 0;
-                          final cost   = game.rigCost(rig);
-                          final canBuy = rig.costBtc > 0 &&
-                              game.canAfford(rig) &&
-                              game.canBuyMoreRigs;
+                          final count   = counts[rig.id] ?? 0;
+                          final product = ShopProducts.farmIapProductForRig(rig.id);
+                          final storeProduct = product != null ? iap.getProduct(product.id) : null;
+                          final catalogPrice = product?.price ?? '';
+                          final livePrice = storeProduct?.price ?? '';
+                          final priceStrUsd = livePrice.isNotEmpty
+                              ? livePrice
+                              : (catalogPrice.isNotEmpty ? catalogPrice : null);
+                          final canTryIap = product != null &&
+                              game.canBuyMoreRigs &&
+                              iap.available;
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 10),
                             child: _RigCard(
-                              rig:     rig,
-                              count:   count,
-                              cost:    cost,
-                              canBuy:  canBuy,
-                              isFull:  !game.canBuyMoreRigs,
-                              onBuy: () async {
-                                await game.buyRig(rig);
-                                if (context.mounted) {
-                                  _toast(context, '${rig.name} added to farm');
-                                }
-                              },
+                              rig:            rig,
+                              count:          count,
+                              isFull:         !game.canBuyMoreRigs,
+                              priceStrUsd:    priceStrUsd,
+                              storeHasLivePrice: storeProduct != null,
+                              iapLoading:     iap.loading,
+                              billingReady:   iap.available,
+                              shopProduct:    product,
+                              farmMiningMultiplier: game.currentFarmTier.miningMultiplier,
+                              onBuyWithUsd:   product != null && canTryIap
+                                  ? () async {
+                                      final pid = product.id;
+                                      if (iap.getProduct(pid) == null) {
+                                        await iap.loadProducts();
+                                      }
+                                      if (!context.mounted) return;
+                                      if (iap.getProduct(pid) == null) {
+                                        _toast(
+                                          context,
+                                          iap.error ??
+                                              'Could not load this product. Check Play Console IDs.',
+                                        );
+                                        return;
+                                      }
+                                      final ok = await iap.buyProduct(pid);
+                                      if (context.mounted) {
+                                        _toast(
+                                          context,
+                                          ok
+                                              ? 'Complete purchase in Google Play'
+                                              : (iap.error ?? 'Purchase failed'),
+                                        );
+                                      }
+                                    }
+                                  : null,
                             ),
                           );
                         }),
@@ -278,7 +546,7 @@ class _FarmTierCard extends StatelessWidget {
               ]),
               const SizedBox(height: 6),
               Text(
-                'Mining multiplier ×${game.currentFarmTier.miningMultiplier.toStringAsFixed(2)}',
+                'Mining multiplier ×${game.currentFarmTier.miningMultiplier.toStringAsFixed(2)} (applies to all rigs)',
                 style: const TextStyle(color: _D.textMid, fontSize: 12),
               ),
               const SizedBox(height: 16),
@@ -419,28 +687,36 @@ class _StatTile extends StatelessWidget {
   );
 }
 
-// ─── Rig card ─────────────────────────────────────────────────────────────────
+// ─── Rig card (IAP USD only) ─────────────────────────────────────────────────
 class _RigCard extends StatelessWidget {
   final MiningRig rig;
   final int count;
-  final double cost;
-  final bool canBuy;
   final bool isFull;
-  final VoidCallback onBuy;
+  final String? priceStrUsd;
+  /// Play Billing returned a price for this SKU.
+  final bool storeHasLivePrice;
+  final bool iapLoading;
+  final bool billingReady;
+  final OneTimeProduct? shopProduct;
+  final double farmMiningMultiplier;
+  final VoidCallback? onBuyWithUsd;
 
   const _RigCard({
     required this.rig,
     required this.count,
-    required this.cost,
-    required this.canBuy,
     required this.isFull,
-    required this.onBuy,
+    this.priceStrUsd,
+    required this.storeHasLivePrice,
+    required this.iapLoading,
+    required this.billingReady,
+    this.shopProduct,
+    required this.farmMiningMultiplier,
+    this.onBuyWithUsd,
   });
 
   @override
   Widget build(BuildContext context) {
-    final meta     = _metaForRig(rig.id);
-    final isStarter = rig.costBtc <= 0;
+    final meta = _metaForRig(rig.id);
 
     return Container(
       decoration: BoxDecoration(
@@ -459,101 +735,136 @@ class _RigCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
-            // Icon
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: meta.accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: meta.accent.withValues(alpha: 0.25),
-                  width: 1,
-                ),
-              ),
-              child: Icon(meta.icon, color: meta.accent, size: 22),
-            ),
-            const SizedBox(width: 14),
-
-            // Info
+            // Tappable: open perks (buy button is outside this gesture)
             Expanded(
-              child: Column(
+              child: GestureDetector(
+                onTap: () => _showRigPerksSheet(
+                  context,
+                  rig: rig,
+                  meta: meta,
+                  count: count,
+                  isFull: isFull,
+                  priceStrUsd: priceStrUsd,
+                  storeHasLivePrice: storeHasLivePrice,
+                  billingReady: billingReady,
+                  iapLoading: iapLoading,
+                  onBuyWithUsd: onBuyWithUsd,
+                  farmMiningMultiplier: farmMiningMultiplier,
+                  shopProduct: shopProduct,
+                ),
+                behavior: HitTestBehavior.opaque,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: meta.accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: meta.accent.withValues(alpha: 0.25),
+                          width: 1,
+                        ),
+                      ),
+                      child: Icon(meta.icon, color: meta.accent, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: [
-                    Expanded(
-                      child: Text(
-                        rig.name,
-                        style: const TextStyle(
-                          color: _D.textHi,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (meta.tier.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: meta.accent.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
+                  Row(
+                    children: [
+                      Expanded(
                         child: Text(
-                          meta.tier,
-                          style: TextStyle(
-                            color: meta.accent,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ]),
-                  const SizedBox(height: 4),
-                  Row(children: [
-                    Icon(Icons.bolt_rounded, color: meta.accent, size: 12),
-                    const SizedBox(width: 3),
-                    Flexible(
-                      child: Text(
-                        '${rig.btcPerMin} BTC/min',
-                        style: TextStyle(
-                          color: meta.accent,
-                          fontFamily: AppTheme.fontFamily,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (!isStarter) ...[
-                      const SizedBox(width: 10),
-                      Icon(Icons.currency_bitcoin, color: _D.textMid, size: 12),
-                      Flexible(
-                        child: Text(
-                          cost.toStringAsFixed(6),
+                          rig.name,
                           style: const TextStyle(
-                            color: _D.textMid,
-                            fontFamily: AppTheme.fontFamily,
-                            fontSize: 11,
+                            color: _D.textHi,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
                           ),
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (meta.tier.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: meta.accent.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              meta.tier,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: meta.accent,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
-                  ]),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.bolt_rounded, color: meta.accent, size: 12),
+                      const SizedBox(width: 3),
+                      Expanded(
+                        child: Text(
+                          '${(rig.btcPerMin * MiningEconomy.outputScale)} BTC/min',
+                          style: TextStyle(
+                            color: meta.accent,
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _D.green.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'USD',
+                          style: TextStyle(
+                            color: _D.green,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    ),
 
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
 
-            // Right side: count badge + buy btn
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
+            // Right: count + IAP (USD) only — flexible width to avoid Row overflow
+            Flexible(
+              fit: FlexFit.loose,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 if (count > 0)
                   Container(
                     margin: const EdgeInsets.only(bottom: 6),
@@ -573,81 +884,90 @@ class _RigCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                if (isStarter)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: _D.cardBord,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'Starter',
-                      style: TextStyle(color: _D.textLow, fontSize: 11),
+                if (isFull)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    child: Text(
+                      'Farm full',
+                      style: const TextStyle(color: _D.textLow, fontSize: 11),
                     ),
                   )
+                else if (priceStrUsd == null)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    child: Text('—', style: TextStyle(color: _D.textLow, fontSize: 11)),
+                  )
                 else
-                  _BuyBtn(
-                    canBuy: canBuy,
-                    isFull: isFull,
-                    onTap: onBuy,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (!billingReady)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Text(
+                            'Billing unavailable',
+                            style: TextStyle(color: _D.textLow, fontSize: 10),
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
+                      SizedBox(
+                        height: 36,
+                        child: onBuyWithUsd != null
+                            ? FilledButton.icon(
+                                onPressed: (isFull || iapLoading) ? null : onBuyWithUsd,
+                                icon: iapLoading
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Icon(Icons.shopping_cart_outlined, size: 16),
+                                label: Text(
+                                  priceStrUsd!.startsWith('\$') ? priceStrUsd! : '\$$priceStrUsd',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                ),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: _D.green,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  minimumSize: Size.zero,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              )
+                            : FilledButton.icon(
+                                onPressed: null,
+                                icon: const Icon(Icons.shopping_cart_outlined, size: 16),
+                                label: Text(
+                                  priceStrUsd!.startsWith('\$') ? priceStrUsd! : '\$$priceStrUsd',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                ),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: _D.green.withValues(alpha: 0.45),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  minimumSize: Size.zero,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                      ),
+                      if (!storeHasLivePrice && billingReady && !isFull && onBuyWithUsd != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Estimated — opens Google Play',
+                            style: TextStyle(color: _D.textLow, fontSize: 9),
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
+                    ],
                   ),
               ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Buy button ───────────────────────────────────────────────────────────────
-class _BuyBtn extends StatefulWidget {
-  final bool canBuy;
-  final bool isFull;
-  final VoidCallback onTap;
-  const _BuyBtn({required this.canBuy, required this.isFull, required this.onTap});
-
-  @override
-  State<_BuyBtn> createState() => _BuyBtnState();
-}
-
-class _BuyBtnState extends State<_BuyBtn> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final label = widget.isFull ? 'Full' : 'Buy';
-    return GestureDetector(
-      onTapDown: widget.canBuy ? (_) => setState(() => _pressed = true) : null,
-      onTapUp: widget.canBuy ? (_) { setState(() => _pressed = false); widget.onTap(); } : null,
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.93 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            gradient: widget.canBuy
-                ? const LinearGradient(colors: [Color(0xFFF5A623), Color(0xFFE08800)])
-                : null,
-            color: widget.canBuy ? null : _D.cardBord,
-            borderRadius: BorderRadius.circular(9),
-            boxShadow: widget.canBuy
-                ? [BoxShadow(
-              color: _D.gold.withValues(alpha: 0.35),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            )]
-                : null,
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: widget.canBuy ? Colors.black : _D.textLow,
-              fontWeight: FontWeight.w800,
-              fontSize: 12,
             ),
-          ),
+          ],
         ),
       ),
     );

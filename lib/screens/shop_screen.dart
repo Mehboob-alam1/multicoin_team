@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/mining_rig.dart';
 import '../models/shop_product.dart';
 import '../services/event_service.dart';
 import '../services/game_state_service.dart';
@@ -29,22 +28,6 @@ class _D {
   static const textMid  = Color(0xFF6B7280);
   static const textLow  = Color(0xFF9CA3AF);
 }
-
-// ─── Rig metadata ─────────────────────────────────────────────────────────────
-class _RigMeta {
-  final IconData icon;
-  final Color accent;
-  final String tier;
-  const _RigMeta(this.icon, this.accent, this.tier);
-}
-
-_RigMeta _metaForRig(String id) => switch (id) {
-  'gpu_rig'        => const _RigMeta(Icons.memory_rounded,       _D.green,    'Tier II'),
-  'mining_rack'    => const _RigMeta(Icons.view_module_rounded,  _D.electric, 'Tier III'),
-  'warehouse_farm' => const _RigMeta(Icons.warehouse_rounded,    _D.gold,     'Tier IV'),
-  'mega_facility'  => const _RigMeta(Icons.auto_awesome_rounded, _D.purple,   'Tier V'),
-  _                => const _RigMeta(Icons.hardware_rounded,     _D.textMid,  ''),
-};
 
 // ─── Tab model ────────────────────────────────────────────────────────────────
 class _Tab {
@@ -338,7 +321,7 @@ class _RigsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView(
     physics: const BouncingScrollPhysics(),
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+    padding: EdgeInsets.fromLTRB(AppTheme.pagePaddingH, 12, AppTheme.pagePaddingH, AppTheme.pageBottomPadding(context)),
     children: [
       // Sale banner
       if (events.rigDiscount > 0) ...[
@@ -350,113 +333,32 @@ class _RigsTab extends StatelessWidget {
       _TipCard(
         icon:    Icons.auto_graph_rounded,
         accent:  _D.electric,
-        text:    'Earlier rig upgrades snowball your BTC output. Buy capacity and rate upgrades first.',
+        text:    'Earlier rig upgrades snowball your BTC output. Upgrade your farm tier on the Mining Farm tab.',
       ),
       const SizedBox(height: 14),
 
-      _SectionLabel(label: 'AVAILABLE RIGS'),
-      const SizedBox(height: 10),
-
-      ...MiningRigs.all.where((r) => r.costBtc > 0).map((rig) {
-        final meta   = _metaForRig(rig.id);
-        final canBuy = game.canAfford(rig) && game.canBuyMoreRigs;
-        final cost   = game.rigCost(rig);
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: _RigShopCard(
-            rig:    rig,
-            meta:   meta,
-            cost:   cost,
-            canBuy: canBuy,
-            isFull: !game.canBuyMoreRigs,
-            onTap: () async {
-              if (!canBuy) {
-                _toast(context, !game.canBuyMoreRigs
-                    ? 'Farm capacity reached — upgrade first.'
-                    : 'Need ${cost.toStringAsFixed(6)} BTC · You have ${game.btcBalance.toStringAsFixed(6)} BTC');
-                return;
-              }
-              await game.buyRig(rig);
-              if (context.mounted) _toast(context, '${rig.name} added to farm!');
-            },
+      _SectionLabel(label: 'RIGS (USD ONLY)'),
+      const SizedBox(height: 8),
+      _TipCard(
+        icon:    Icons.storefront_rounded,
+        accent:  _D.green,
+        text:    'Rigs are bought only on the Mining Farm tab (USD / Google Play), with live prices. This shop has packs, boosts, and other upgrades — not individual rigs.',
+      ),
+      const SizedBox(height: 14),
+      SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: () => Navigator.pushNamed(context, '/farm'),
+          icon: const Icon(Icons.warehouse_rounded, size: 20),
+          label: const Text('Open Mining Farm'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _D.gold,
+            side: BorderSide(color: _D.gold.withValues(alpha: 0.5)),
+            padding: const EdgeInsets.symmetric(vertical: 14),
           ),
-        );
-      }),
-    ],
-  );
-}
-
-class _RigShopCard extends StatelessWidget {
-  final MiningRig rig;
-  final _RigMeta meta;
-  final double cost;
-  final bool canBuy;
-  final bool isFull;
-  final VoidCallback onTap;
-  const _RigShopCard({
-    required this.rig,
-    required this.meta,
-    required this.cost,
-    required this.canBuy,
-    required this.isFull,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: _D.card,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: _D.cardBord),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: Row(children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: meta.accent.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: meta.accent.withValues(alpha: 0.25)),
-          ),
-          child: Icon(meta.icon, color: meta.accent, size: 22),
         ),
-        const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(
-              child: Text(rig.name,
-                  style: const TextStyle(color: _D.textHi, fontWeight: FontWeight.w700, fontSize: 14),
-                  overflow: TextOverflow.ellipsis),
-            ),
-            if (meta.tier.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              _Pill(label: meta.tier, color: meta.accent),
-            ],
-          ]),
-          const SizedBox(height: 4),
-          Row(children: [
-            Icon(Icons.bolt_rounded, color: meta.accent, size: 12),
-            const SizedBox(width: 3),
-            Flexible(
-              child: Text('${rig.btcPerMin} BTC/min',
-                  style: TextStyle(color: meta.accent, fontFamily: AppTheme.fontFamily, fontSize: 11, fontWeight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis),
-            ),
-            const SizedBox(width: 10),
-            const Icon(Icons.currency_bitcoin, color: _D.textMid, size: 12),
-            Flexible(
-              child: Text(cost.toStringAsFixed(6),
-                  style: const TextStyle(color: _D.textMid, fontFamily: AppTheme.fontFamily, fontSize: 11),
-                  overflow: TextOverflow.ellipsis),
-            ),
-          ]),
-        ])),
-        const SizedBox(width: 10),
-        _BuyBtn(canBuy: canBuy, isFull: isFull, onTap: onTap),
-      ]),
-    ),
+      ),
+    ],
   );
 }
 
@@ -470,7 +372,7 @@ class _OneTimeTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView(
     physics: const BouncingScrollPhysics(),
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+    padding: EdgeInsets.fromLTRB(AppTheme.pagePaddingH, 12, AppTheme.pagePaddingH, AppTheme.pageBottomPadding(context)),
     children: [
       if (iap.error != null) ...[
         _ErrorBanner(message: iap.error!),
@@ -480,7 +382,7 @@ class _OneTimeTab extends StatelessWidget {
       _TipCard(
         icon:   Icons.local_fire_department_rounded,
         accent: _D.gold,
-        text:   'One-time packs give instant mining acceleration and stack with premium.',
+        text:   'Permanent rate bonuses apply to all mining and stack with your farm, session, and premium.',
       ),
       const SizedBox(height: 14),
 
@@ -558,9 +460,10 @@ class _OneTimeTab extends StatelessWidget {
       }
       return;
     }
+    if (product.id == 'boost_2x_1h') game.activateBoost1h();
     await game.applyOneTimePurchase(
         productId: product.id, btcAmount: product.btcAmount, rigId: product.rigId);
-    if (context.mounted) _toast(context, 'Claimed: ${product.name}');
+    if (context.mounted) _toast(context, product.id == 'boost_2x_1h' ? '⚡ 2× Boost active for 1 hour!' : 'Claimed: ${product.name}');
   }
 }
 
@@ -610,14 +513,20 @@ class _OneTimeCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: _D.gold.withValues(alpha: 0.3)),
             ),
-            child: Text(
-              priceStr,
-              style: const TextStyle(
-                color: _D.gold,
-                fontFamily: AppTheme.fontFamily,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.attach_money, color: _D.gold, size: 14),
+                Text(
+                  product.isBtcPrice ? priceStr : (priceStr.startsWith('\$') ? priceStr : '\$' + priceStr) + (priceStr.toUpperCase().contains('USD') ? '' : ' USD'),
+                  style: const TextStyle(
+                    color: _D.gold,
+                    fontFamily: AppTheme.fontFamily,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ),
         ]),
@@ -653,7 +562,7 @@ class _PremiumTab extends StatelessWidget {
 
     return ListView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      padding: EdgeInsets.fromLTRB(AppTheme.pagePaddingH, 12, AppTheme.pagePaddingH, AppTheme.pageBottomPadding(context)),
       children: [
         // Active badge
         if (isPremium) ...[
@@ -663,7 +572,7 @@ class _PremiumTab extends StatelessWidget {
           _TipCard(
             icon:   Icons.workspace_premium_rounded,
             accent: _D.purple,
-            text:   'Premium adds 1.5× mining speed continuously and combines with boosts and events.',
+            text:   'Premium adds 1.5× to all mining (rigs × farm tier). Stacks with session bonus and 2× boosts.',
           ),
           const SizedBox(height: 14),
         ],
@@ -799,14 +708,20 @@ class _PremiumPlanCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: _D.purple.withValues(alpha: 0.3)),
             ),
-            child: Text(
-              priceStr,
-              style: const TextStyle(
-                color: _D.purple,
-                fontFamily: AppTheme.fontFamily,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.attach_money, color: _D.purple, size: 14),
+                Text(
+                  (priceStr.startsWith('\$') ? priceStr : '\$' + priceStr) + (priceStr.toUpperCase().contains('USD') ? '' : ' USD') + (plan.period == 'month' ? '/mo' : '/yr'),
+                  style: const TextStyle(
+                    color: _D.purple,
+                    fontFamily: AppTheme.fontFamily,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ),
         ]),

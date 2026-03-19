@@ -97,9 +97,16 @@ class HomeBalanceHero extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  worthUsd != null ? '≈ \$${worthUsd!.toStringAsFixed(2)} USD' : '≈ — USD',
-                  style: TextStyle(fontSize: 12, color: HomeTheme.limeTextMid),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.attach_money, size: 14, color: HomeTheme.limeTextMid),
+                    const SizedBox(width: 2),
+                    Text(
+                      worthUsd != null ? '≈ ${worthUsd!.toStringAsFixed(2)} USD' : '≈ — USD',
+                      style: TextStyle(fontSize: 12, color: HomeTheme.limeTextMid),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -123,8 +130,9 @@ class HomeBalanceHero extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Icon(Icons.attach_money, size: 14, color: HomeTheme.limeTextHigh),
                       Text(
-                        '\$${price.toStringAsFixed(0)}',
+                        price.toStringAsFixed(0),
                         style: HomeTheme.monoNumber(fontSize: 14, weight: FontWeight.w700).copyWith(color: HomeTheme.limeTextHigh),
                       ),
                       const SizedBox(width: 6),
@@ -365,22 +373,32 @@ class HomeHashrateCards extends StatelessWidget {
     final ratePerHr = game.totalBtcPerMin * 60;
     final estMonthly = ratePerHr * 24 * 30;
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: _HomeStatCard(
-            title: 'Hashrate',
-            value: '${(game.totalBtcPerMin * 60).toStringAsFixed(6)} ₿/hr',
-            icon: Icons.speed_rounded,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _HomeStatCard(
+                title: 'Hashrate',
+                value: '${(game.totalBtcPerMin * 60).toStringAsFixed(6)} ₿/hr',
+                icon: Icons.speed_rounded,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _HomeStatCard(
+                title: 'Est. monthly',
+                value: '${estMonthly.toStringAsFixed(6)} ₿',
+                icon: Icons.calendar_month_rounded,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _HomeStatCard(
-            title: 'Est. monthly',
-            value: '${estMonthly.toStringAsFixed(6)} ₿',
-            icon: Icons.calendar_month_rounded,
-          ),
+        const SizedBox(height: 8),
+        Text(
+          'From your rigs × farm tier × active session/premium/boost',
+          style: TextStyle(fontSize: 10, color: HomeTheme.limeTextLow),
         ),
       ],
     );

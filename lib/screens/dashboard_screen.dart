@@ -22,73 +22,132 @@ import '../services/weekly_challenge_service.dart';
 import '../widgets/btc_price_chart.dart';
 import '../widgets/fade_slide_in.dart';
 import '../widgets/minimizable_native_ad.dart';
+import '../theme/app_theme.dart';
 import '../theme/home_theme.dart';
 import '../widgets/smart_banner_ad.dart';
 import 'home_dashboard_content.dart';
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
-class _D {
+// ─── Design Tokens ────────────────────────────────────────────────────────────
+class _T {
   // Backgrounds
-  static const bg       = Color(0xFFF7F8FA);
-  static const white    = Color(0xFFFFFFFF);
+  static const pageBg     = Color(0xFFF7F8FA);
+  static const surface    = Color(0xFFFFFFFF);
+  static const surfaceAlt = Color(0xFFFAFBFC);
+  static const chipBg     = Color(0xFFF1F3F7);
 
   // Borders
-  static const border   = Color(0x12000000); // 0.07 alpha ≈ border-em
-  static const borderSm = Color(0x0D000000); // subtler
+  static const border     = Color(0xFFE8EBEF);
+  static const borderSub  = Color(0xFFF0F2F6);
 
-  // Accents
+  // Amber / Gold
   static const amber      = Color(0xFFF59E0B);
+  static const amberText  = Color(0xFF78350F);
   static const amberBg    = Color(0xFFFFFBEB);
-  static const amberBorder= Color(0x33F59E0B);
-  static const amberDeep  = Color(0xFF92400E);
+  static const amberBdr   = Color(0xFFFDE68A);
 
+  // Emerald
   static const green      = Color(0xFF10B981);
-  static const greenBg    = Color(0xFFF0FDF6);
-  static const greenDeep  = Color(0xFF065F46);
+  static const greenText  = Color(0xFF064E3B);
+  static const greenBg    = Color(0xFFF0FDF9);
+  static const greenBdr   = Color(0xFFBBF7D0);
 
-  static const blue       = Color(0xFF3B82F6);
-  static const blueBg     = Color(0xFFEFF6FF);
-  static const blueDeep   = Color(0xFF1D4ED8);
+  // Sky
+  static const blue       = Color(0xFF0EA5E9);
+  static const blueText   = Color(0xFF0C4A6E);
+  static const blueBg     = Color(0xFFF0F9FF);
+  static const blueBdr    = Color(0xFFBAE6FD);
 
-  static const purple     = Color(0xFF8B5CF6);
-  static const purpleBg   = Color(0xFFF5F3FF);
-  static const purpleDeep = Color(0xFF5B21B6);
+  // Violet
+  static const violet     = Color(0xFF7C3AED);
+  static const violetText = Color(0xFF4C1D95);
+  static const violetBg   = Color(0xFFF5F3FF);
+  static const violetBdr  = Color(0xFFDDD6FE);
 
-  static const red        = Color(0xFFEF4444);
-  static const redBg      = Color(0xFFFEF2F2);
+  // Rose
+  static const rose       = Color(0xFFEF4444);
+  static const roseBg     = Color(0xFFFFF1F2);
+  static const roseBdr    = Color(0xFFFECACA);
 
   // Text
-  static const text  = Color(0xFF0D0F12);
-  static const sub   = Color(0xFF6B7280);
-  static const hint  = Color(0xFFB0B7C3);
+  static const ink        = Color(0xFF0F1117);
+  static const inkMid     = Color(0xFF6B7280);
+  static const inkFaint   = Color(0xFFB8C0CC);
 
   // Radii
   static const r8  = BorderRadius.all(Radius.circular(8));
   static const r10 = BorderRadius.all(Radius.circular(10));
-  static const r14 = BorderRadius.all(Radius.circular(14));
-  static const r18 = BorderRadius.all(Radius.circular(18));
+  static const r12 = BorderRadius.all(Radius.circular(12));
+  static const r16 = BorderRadius.all(Radius.circular(16));
+  static const r20 = BorderRadius.all(Radius.circular(20));
+  static const r24 = BorderRadius.all(Radius.circular(24));
+
+  // Spacing
+  static const px  = 20.0;  // horizontal page padding
+  static const gap = 12.0;  // grid gap
+  static const sec = 28.0;  // section spacing
 }
 
-// ─── Main screen ─────────────────────────────────────────────────────────────
+// ─── Typography ───────────────────────────────────────────────────────────────
+TextStyle _label({
+  double size = 13,
+  FontWeight weight = FontWeight.w400,
+  Color color = _T.ink,
+  double? letterSpacing,
+  double? height,
+}) => GoogleFonts.dmSans(
+  fontSize: size,
+  fontWeight: weight,
+  color: color,
+  letterSpacing: letterSpacing,
+  height: height,
+);
+
+TextStyle _mono({
+  double size = 13,
+  FontWeight weight = FontWeight.w400,
+  Color color = _T.ink,
+}) => GoogleFonts.jetBrainsMono(
+  fontSize: size,
+  fontWeight: weight,
+  color: color,
+);
+
+// ─── Card decoration ──────────────────────────────────────────────────────────
+BoxDecoration _card({
+  Color? bg,
+  Gradient? gradient,
+  Color? border,
+  BorderRadius? radius,
+  List<BoxShadow>? shadows,
+}) => BoxDecoration(
+  color: gradient == null ? (bg ?? _T.surface) : null,
+  gradient: gradient,
+  borderRadius: radius ?? _T.r16,
+  border: Border.all(color: border ?? _T.border, width: 0.75),
+  boxShadow: shadows ?? const [
+    BoxShadow(color: Color(0x07000000), blurRadius: 12, offset: Offset(0, 3)),
+    BoxShadow(color: Color(0x04000000), blurRadius: 3,  offset: Offset(0, 1)),
+  ],
+);
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
-
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _pulseCtrl;
+  late final AnimationController _pulse;
 
   @override
   void initState() {
     super.initState();
-    _pulseCtrl = AnimationController(
+    _pulse = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 3),
     )..repeat(reverse: true);
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BtcPriceService>().fetchAll();
     });
@@ -96,7 +155,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   void dispose() {
-    _pulseCtrl.dispose();
+    _pulse.dispose();
     super.dispose();
   }
 
@@ -123,308 +182,249 @@ class _DashboardScreenState extends State<DashboardScreen>
     final worthUsd = btcPrice.balanceWorthUsd(game.btcBalance);
 
     return Scaffold(
-      backgroundColor: _D.bg,
+      backgroundColor: _T.pageBg,
       body: SafeArea(
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
-            // ── App bar ────────────────────────────────────────────
+
+            // ── App bar ────────────────────────────────────────────────────
             SliverAppBar(
               pinned: true,
               elevation: 0,
-              backgroundColor: _D.bg,
+              backgroundColor: _T.pageBg,
               surfaceTintColor: Colors.transparent,
-              title: Row(children: [
-                _LogoIcon(),
-                const SizedBox(width: 9),
-                Text(
-                  'Mining Tycoon',
-                  style: GoogleFonts.dmSans(
-                    color: _D.text,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.3,
+              toolbarHeight: 64,
+              flexibleSpace: Container(
+                decoration: BoxDecoration(
+                  color: _T.pageBg,
+                  border: Border(
+                    bottom: BorderSide(color: _T.border, width: 0.75),
                   ),
+                ),
+              ),
+              title: Row(children: [
+                _AppBarLogo(),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Mining Tycoon', style: _label(size: 16, weight: FontWeight.w700, letterSpacing: -0.3)),
+                    const SizedBox(height: 1),
+                    Text('DASHBOARD', style: _label(size: 9, weight: FontWeight.w600, color: _T.amber, letterSpacing: 1.8)),
+                  ],
                 ),
               ]),
               actions: [
                 if (game.syncInProgress)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
                     child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: _D.amber),
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 1.5, color: _T.amber),
                     ),
                   ),
-                _IconBtn(
+                _AppBarAction(
                   icon: Icons.person_outline_rounded,
                   onTap: () => Navigator.pushNamed(context, '/profile'),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: _T.px),
               ],
             ),
 
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
+              padding: EdgeInsets.fromLTRB(_T.px, 20, _T.px, AppTheme.pageBottomPadding(context)),
+              sliver: SliverList(delegate: SliverChildListDelegate([
 
-                  // ── Idle banner ───────────────────────────────────
-                  if (idle != null && idle > 0) ...[
-                    FadeSlideIn(child: _IdleBanner(idle: idle)),
-                    const SizedBox(height: 12),
-                  ],
+                // ── Idle banner ──────────────────────────────────────────
+                if (idle != null && idle > 0) ...[
+                  FadeSlideIn(child: _IdleBanner(idle: idle)),
+                  const SizedBox(height: 16),
+                ],
 
-                  // ── Balance hero ──────────────────────────────────
-                  FadeSlideIn(
-                    child: _BalanceHero(
-                      btcBalance: game.btcBalance,
-                      worthUsd: worthUsd,
-                      btcPerMin: game.totalBtcPerMin,
-                      isBoostActive: dailyBoost.isActive,
-                      isSessionActive: game.isSessionActive,
-                      sessionTimeLeft: game.sessionTimeLeft,
-                      pulse: _pulseCtrl,
-                    ),
+                // ── Balance hero ─────────────────────────────────────────
+                FadeSlideIn(
+                  child: _BalanceHero(
+                    btcBalance: game.btcBalance,
+                    worthUsd: worthUsd,
+                    btcPerMin: game.totalBtcPerMin,
+                    isBoostActive: dailyBoost.isActive,
+                    isSessionActive: game.isSessionActive,
+                    sessionTimeLeft: game.sessionTimeLeft,
+                    pulse: _pulse,
                   ),
-                  const SizedBox(height: 10),
+                ),
+                SizedBox(height: AppTheme.cardSpacing),
 
-                  // ── Mine CTA ──────────────────────────────────────
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 50),
-                    child: _MineCTA(
-                      isActive: game.isSessionActive,
-                      onTap: () => Navigator.pushNamed(context, '/farm'),
-                    ),
+                // ── Mine CTA ─────────────────────────────────────────────
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 50),
+                  child: _MineCTA(
+                    isActive: game.isSessionActive,
+                    onTap: () => Navigator.pushNamed(context, '/farm'),
                   ),
+                ),
+                SizedBox(height: AppTheme.sectionSpacing),
+
+                // ── Stats row 1 ──────────────────────────────────────────
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 80),
+                  child: Row(children: [
+                    Expanded(child: _StatCard(
+                      icon: Icons.memory_rounded,
+                      iconColor: _T.blue, iconBg: _T.blueBg, iconBdr: _T.blueBdr,
+                      label: 'Active rigs', value: '${game.ownedRigIds.length}',
+                    )),
+                    const SizedBox(width: _T.gap),
+                    Expanded(child: _StatCard(
+                      icon: Icons.factory_rounded,
+                      iconColor: _T.amber, iconBg: _T.amberBg, iconBdr: _T.amberBdr,
+                      label: 'Farm tier', value: game.currentFarmTier.name,
+                    )),
+                  ]),
+                ),
+                const SizedBox(height: _T.gap),
+
+                // ── Stats row 2 ──────────────────────────────────────────
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 100),
+                  child: Row(children: [
+                    Expanded(child: _StatCard(
+                      icon: Icons.savings_rounded,
+                      iconColor: _T.green, iconBg: _T.greenBg, iconBdr: _T.greenBdr,
+                      label: 'Lifetime mined',
+                      value: '${game.lifetimeMinedBtc.toStringAsFixed(4)} ₿',
+                    )),
+                    const SizedBox(width: _T.gap),
+                    Expanded(child: _StatCard(
+                      icon: Icons.bolt_rounded,
+                      iconColor: _T.violet, iconBg: _T.violetBg, iconBdr: _T.violetBdr,
+                      label: 'Rate / min',
+                      value: '${game.totalBtcPerMin.toStringAsFixed(6)} ₿',
+                      mono: true,
+                    )),
+                  ]),
+                ),
+                const SizedBox(height: _T.sec),
+
+                // ── BTC Market ───────────────────────────────────────────
+                FadeSlideIn(delay: const Duration(milliseconds: 120), child: const _SectionHeader(label: 'BTC Market')),
+                const SizedBox(height: 12),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 135),
+                  child: Container(decoration: _card(), child: HomeGraphCard(priceService: btcPrice)),
+                ),
+                const SizedBox(height: _T.sec),
+
+                // ── Quick actions ────────────────────────────────────────
+                FadeSlideIn(delay: const Duration(milliseconds: 150), child: const _SectionHeader(label: 'Quick Actions')),
+                const SizedBox(height: 12),
+                FadeSlideIn(delay: const Duration(milliseconds: 165), child: _QuickActionsRow(context: context)),
+                const SizedBox(height: _T.sec),
+
+                // ── Bonuses ──────────────────────────────────────────────
+                FadeSlideIn(delay: const Duration(milliseconds: 180), child: const _SectionHeader(label: 'Bonuses & Rewards')),
+                const SizedBox(height: 12),
+
+                if (comeback.canClaim) ...[
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 195),
+                    child: _ComebackBanner(comeback: comeback, game: game),
+                  ),
+                  const SizedBox(height: _T.gap),
+                ],
+
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 210),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(child: _DailyBoostCard(dailyBoost: dailyBoost)),
+                    const SizedBox(width: _T.gap),
+                    Expanded(child: _LoginStreakCard(loginStreak: loginStreak, game: game)),
+                  ]),
+                ),
+                const SizedBox(height: _T.gap),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 225),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(child: _WeeklyChallengeCard(weeklyChallenge: weeklyChallenge, game: game)),
+                    const SizedBox(width: _T.gap),
+                    Expanded(child: _GoalsCard(goals: goals, game: game)),
+                  ]),
+                ),
+                const SizedBox(height: _T.gap),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 240),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(child: _SpinCard(spin: spin)),
+                    const SizedBox(width: _T.gap),
+                    Expanded(child: _ReferralCard(referral: referral)),
+                  ]),
+                ),
+                const SizedBox(height: _T.gap),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 255),
+                  child: _SeasonCard(season: season, game: game),
+                ),
+                const SizedBox(height: _T.sec),
+
+                // ── Operations ───────────────────────────────────────────
+                FadeSlideIn(delay: const Duration(milliseconds: 270), child: const _SectionHeader(label: 'Operations')),
+                const SizedBox(height: 12),
+                FadeSlideIn(delay: const Duration(milliseconds: 285), child: _EnergyCard(energy: energy)),
+                const SizedBox(height: _T.gap),
+                FadeSlideIn(delay: const Duration(milliseconds: 300), child: _LocationsCard(progression: progression)),
+                const SizedBox(height: _T.sec),
+
+                // ── Hidden drop ──────────────────────────────────────────
+                if (drop.isAvailable) ...[
+                  FadeSlideIn(delay: const Duration(milliseconds: 315), child: const _SectionHeader(label: 'Hidden Drop')),
                   const SizedBox(height: 12),
+                  FadeSlideIn(delay: const Duration(milliseconds: 330), child: _DropCard(drop: drop, game: game)),
+                  const SizedBox(height: _T.sec),
+                ],
 
-                  // ── Stats row 1: Rigs / Farm tier ─────────────────
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 80),
-                    child: _Row2(
-                      left: _StatCard(
-                        icon: Icons.memory_rounded,
-                        iconBg: _D.blueBg,
-                        iconColor: _D.blue,
-                        label: 'Active rigs',
-                        value: '${game.ownedRigIds.length}',
-                      ),
-                      right: _StatCard(
-                        icon: Icons.factory_rounded,
-                        iconBg: _D.amberBg,
-                        iconColor: _D.amber,
-                        label: 'Farm tier',
-                        value: game.currentFarmTier.name,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+                // ── Discover ─────────────────────────────────────────────
+                FadeSlideIn(delay: const Duration(milliseconds: 345), child: const _SectionHeader(label: 'Discover')),
+                const SizedBox(height: 12),
+                FadeSlideIn(delay: const Duration(milliseconds: 360), child: const _NewsCard()),
 
-                  // ── Stats row 2: Lifetime / Rate ──────────────────
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 100),
-                    child: _Row2(
-                      left: _StatCard(
-                        icon: Icons.savings_rounded,
-                        iconBg: _D.greenBg,
-                        iconColor: _D.green,
-                        label: 'Lifetime mined',
-                        value: '${game.lifetimeMinedBtc.toStringAsFixed(4)} ₿',
-                      ),
-                      right: _StatCard(
-                        icon: Icons.bolt_rounded,
-                        iconBg: _D.purpleBg,
-                        iconColor: _D.purple,
-                        label: 'Rate / min',
-                        value: '${game.totalBtcPerMin.toStringAsFixed(6)} ₿',
-                        mono: true,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
+                if (adCfg.canShowWebsiteRedirect) ...[
+                  const SizedBox(height: _T.gap),
+                  FadeSlideIn(delay: const Duration(milliseconds: 375), child: _WebsiteCard(adCfg: adCfg)),
+                ],
+                const SizedBox(height: _T.sec),
 
-                  // ── BTC Market ─────────────────────────────────────
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 120),
-                    child: _SecHeader(title: 'BTC Market'),
-                  ),
-                  const SizedBox(height: 10),
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 135),
-                    child: HomeGraphCard(priceService: btcPrice),
-                  ),
-                  const SizedBox(height: 18),
+                // ── How it works ─────────────────────────────────────────
+                FadeSlideIn(delay: const Duration(milliseconds: 390), child: const _SectionHeader(label: 'How It Works')),
+                const SizedBox(height: 12),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 405),
+                  child: const Column(children: [
+                    HomeHowMiningWorksCard(), SizedBox(height: 8),
+                    HomeMiningRewardCard(),   SizedBox(height: 8),
+                    HomeSecurityCard(),       SizedBox(height: 8),
+                    HomeTransparencyCard(),
+                  ]),
+                ),
+                const SizedBox(height: 16),
+                FadeSlideIn(delay: const Duration(milliseconds: 420), child: const HomeTestimonialsCard()),
+                const SizedBox(height: 16),
+                FadeSlideIn(delay: const Duration(milliseconds: 435), child: const HomeFaqCard()),
+                const SizedBox(height: 16),
 
-                  // ── Quick actions ──────────────────────────────────
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 150),
-                    child: _SecHeader(title: 'Quick actions'),
-                  ),
-                  const SizedBox(height: 10),
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 165),
-                    child: _QuickActions(context: context),
-                  ),
-                  const SizedBox(height: 18),
-
-                  // ── Bonuses & rewards ──────────────────────────────
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 180),
-                    child: _SecHeader(title: 'Bonuses & rewards'),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Comeback (full-width if available)
-                  if (comeback.canClaim) ...[
-                    FadeSlideIn(
-                      delay: const Duration(milliseconds: 195),
-                      child: _ComebackCard(comeback: comeback, game: game),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-
-                  // Row: Daily boost + Login streak
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 210),
-                    child: _Row2(
-                      left: _DailyBoostCard(dailyBoost: dailyBoost),
-                      right: _LoginStreakCard(loginStreak: loginStreak, game: game),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Row: Weekly + Goals
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 225),
-                    child: _Row2(
-                      left: _WeeklyChallengeCard(weeklyChallenge: weeklyChallenge, game: game),
-                      right: _GoalsCard(goals: goals, game: game),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Row: Spin + Referral
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 240),
-                    child: _Row2(
-                      left: _SpinCard(spin: spin),
-                      right: _ReferralCard(referral: referral),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Season (full-width)
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 255),
-                    child: _SeasonCard(season: season, game: game),
-                  ),
-                  const SizedBox(height: 18),
-
-                  // ── Operations ─────────────────────────────────────
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 270),
-                    child: _SecHeader(title: 'Operations'),
-                  ),
-                  const SizedBox(height: 10),
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 285),
-                    child: _EnergyCard(energy: energy),
-                  ),
-                  const SizedBox(height: 10),
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 300),
-                    child: _LocationsCard(progression: progression),
-                  ),
-                  const SizedBox(height: 18),
-
-                  // ── Random drop ────────────────────────────────────
-                  if (drop.isAvailable) ...[
-                    FadeSlideIn(
-                      delay: const Duration(milliseconds: 315),
-                      child: _SecHeader(title: 'Hidden drop'),
-                    ),
-                    const SizedBox(height: 10),
-                    FadeSlideIn(
-                      delay: const Duration(milliseconds: 330),
-                      child: _DropCard(drop: drop, game: game),
-                    ),
-                    const SizedBox(height: 18),
-                  ],
-
-                  // ── Discover ───────────────────────────────────────
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 345),
-                    child: _SecHeader(title: 'Discover'),
-                  ),
-                  const SizedBox(height: 10),
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 360),
-                    child: _NewsCard(),
-                  ),
-                  const SizedBox(height: 10),
-
-                  if (adCfg.canShowWebsiteRedirect) ...[
-                    FadeSlideIn(
-                      delay: const Duration(milliseconds: 375),
-                      child: _WebsiteCard(adCfg: adCfg),
-                    ),
-                    const SizedBox(height: 18),
-                  ],
-
-                  // ── How it works ───────────────────────────────────
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 390),
-                    child: _SecHeader(title: 'How it works'),
-                  ),
-                  const SizedBox(height: 10),
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 405),
+                // ── Ad ───────────────────────────────────────────────────
+                if (adCfg.adsActive)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: _card(border: _T.amberBdr),
                     child: const Column(children: [
-                      HomeHowMiningWorksCard(),
-                      SizedBox(height: 8),
-                      HomeMiningRewardCard(),
-                      SizedBox(height: 8),
-                      HomeSecurityCard(),
-                      SizedBox(height: 8),
-                      HomeTransparencyCard(),
+                      MinimizableNativeAd(title: 'Sponsored offer'),
+                      SizedBox(height: 10),
+                      Center(child: SmartBannerAd()),
                     ]),
                   ),
-                  const SizedBox(height: 16),
-
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 420),
-                    child: const HomeTestimonialsCard(),
-                  ),
-                  const SizedBox(height: 16),
-
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 435),
-                    child: const HomeFaqCard(),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ── Sponsor ad (white background) ────────────────────────────
-                  if (adCfg.adsActive) ...[
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(HomeTheme.cardRadius),
-                        color: HomeTheme.cardLight,
-                        border: Border.all(color: HomeTheme.cardLightBorder),
-                      ),
-                      child: const Column(
-                        children: [
-                          MinimizableNativeAd(title: 'Sponsored offer'),
-                          SizedBox(height: 10),
-                          Center(child: SmartBannerAd()),
-                        ],
-                      ),
-                    ),
-                  ],
-                ]),
-              ),
+              ])),
             ),
           ],
         ),
@@ -433,82 +433,62 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 }
 
-// ─── Section header ───────────────────────────────────────────────────────────
-class _SecHeader extends StatelessWidget {
-  final String title;
-  const _SecHeader({required this.title});
-
-  @override
-  Widget build(BuildContext context) => Text(
-    title.toUpperCase(),
-    style: GoogleFonts.dmSans(
-      fontSize: 11,
-      fontWeight: FontWeight.w600,
-      color: _D.sub,
-      letterSpacing: 0.6,
-    ),
-  );
-}
-
-// ─── Two-column helper ────────────────────────────────────────────────────────
-class _Row2 extends StatelessWidget {
-  final Widget left;
-  final Widget right;
-  const _Row2({required this.left, required this.right});
-
-  @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Expanded(child: left),
-      const SizedBox(width: 10),
-      Expanded(child: right),
-    ],
-  );
-}
-
-// ─── Base card decoration ─────────────────────────────────────────────────────
-BoxDecoration _cardDeco({Color? borderColor, BorderRadius? radius}) =>
-    BoxDecoration(
-      color: _D.white,
-      borderRadius: radius ?? _D.r14,
-      border: Border.all(color: borderColor ?? _D.border, width: 0.5),
-    );
-
-// ─── Logo icon ────────────────────────────────────────────────────────────────
-class _LogoIcon extends StatelessWidget {
+// ─── App bar logo ─────────────────────────────────────────────────────────────
+class _AppBarLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-    width: 32,
-    height: 32,
+    width: 38, height: 38,
     decoration: BoxDecoration(
-      color: _D.amberBg,
-      borderRadius: const BorderRadius.all(Radius.circular(9)),
-      border: Border.all(color: _D.amberBorder, width: 0.5),
+      color: _T.amberBg,
+      borderRadius: _T.r12,
+      border: Border.all(color: _T.amberBdr, width: 0.75),
+      boxShadow: [BoxShadow(color: _T.amber.withOpacity(0.16), blurRadius: 8, offset: const Offset(0, 2))],
     ),
-    child: const Icon(Icons.currency_bitcoin, color: _D.amber, size: 17),
+    child: const Icon(Icons.currency_bitcoin, color: _T.amber, size: 19),
   );
 }
 
-// ─── App bar icon button ──────────────────────────────────────────────────────
-class _IconBtn extends StatelessWidget {
+// ─── App bar action button ────────────────────────────────────────────────────
+class _AppBarAction extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
-  const _IconBtn({required this.icon, required this.onTap});
+  const _AppBarAction({required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: Container(
-      width: 34,
-      height: 34,
+      width: 38, height: 38,
       decoration: BoxDecoration(
-        color: _D.white,
-        borderRadius: const BorderRadius.all(Radius.circular(9)),
-        border: Border.all(color: _D.border, width: 0.5),
+        color: _T.surface,
+        borderRadius: _T.r12,
+        border: Border.all(color: _T.border, width: 0.75),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2))],
       ),
-      child: Icon(icon, color: _D.sub, size: 17),
+      child: Icon(icon, color: _T.inkMid, size: 17),
     ),
+  );
+}
+
+// ─── Section header ───────────────────────────────────────────────────────────
+class _SectionHeader extends StatelessWidget {
+  final String label;
+  const _SectionHeader({required this.label});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      Container(
+        width: 3, height: 14,
+        margin: const EdgeInsets.only(right: 10),
+        decoration: BoxDecoration(color: _T.amber, borderRadius: BorderRadius.circular(2)),
+      ),
+      Text(
+        label.toUpperCase(),
+        style: _label(size: 10, weight: FontWeight.w700, color: _T.inkMid, letterSpacing: 1.5),
+      ),
+    ],
   );
 }
 
@@ -519,58 +499,45 @@ class _IdleBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-    decoration: BoxDecoration(
-      color: _D.amberBg,
-      borderRadius: _D.r10,
-      border: Border.all(color: _D.amberBorder, width: 0.5),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    decoration: _card(
+      bg: _T.amberBg, border: _T.amberBdr, radius: _T.r16,
+      shadows: [BoxShadow(color: _T.amber.withOpacity(0.12), blurRadius: 16, offset: const Offset(0, 4))],
     ),
     child: Row(children: [
       Container(
-        width: 30,
-        height: 30,
+        width: 36, height: 36,
         decoration: BoxDecoration(
-          color: _D.amber.withOpacity(0.15),
-          borderRadius: const BorderRadius.all(Radius.circular(8)),
+          color: _T.amber.withOpacity(0.14),
+          borderRadius: BorderRadius.circular(10),
         ),
-        child: const Icon(Icons.notifications_active_rounded, color: _D.amber, size: 15),
+        child: const Icon(Icons.notifications_active_rounded, color: _T.amber, size: 17),
       ),
       const SizedBox(width: 12),
-      Expanded(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(
-            'Welcome back!',
-            style: GoogleFonts.dmSans(color: _D.amberDeep, fontWeight: FontWeight.w600, fontSize: 12),
-          ),
-          Text(
-            'Miners generated +${idle.toStringAsFixed(8)} BTC',
-            style: GoogleFonts.dmSans(color: _D.amberDeep.withOpacity(0.7), fontSize: 11),
-          ),
-        ]),
-      ),
-      const Icon(Icons.chevron_right_rounded, color: _D.amber, size: 16),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Welcome back!', style: _label(size: 13, weight: FontWeight.w700, color: _T.amberText)),
+        const SizedBox(height: 2),
+        Text('Miners earned +${idle.toStringAsFixed(8)} BTC while away', style: _label(size: 11, color: _T.amber)),
+      ])),
+      const SizedBox(width: 4),
+      Icon(Icons.chevron_right_rounded, color: _T.amber.withOpacity(0.5), size: 18),
     ]),
   );
 }
 
-// ─── Balance hero ─────────────────────────────────────────────────────────────
+// ─── Balance hero card ────────────────────────────────────────────────────────
 class _BalanceHero extends StatelessWidget {
   final double btcBalance;
   final double? worthUsd;
   final double btcPerMin;
-  final bool isBoostActive;
-  final bool isSessionActive;
+  final bool isBoostActive, isSessionActive;
   final Duration sessionTimeLeft;
   final AnimationController pulse;
 
   const _BalanceHero({
-    required this.btcBalance,
-    required this.worthUsd,
-    required this.btcPerMin,
-    required this.isBoostActive,
-    required this.isSessionActive,
-    required this.sessionTimeLeft,
-    required this.pulse,
+    required this.btcBalance, required this.worthUsd, required this.btcPerMin,
+    required this.isBoostActive, required this.isSessionActive,
+    required this.sessionTimeLeft, required this.pulse,
   });
 
   @override
@@ -580,138 +547,121 @@ class _BalanceHero extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: _D.white,
-        borderRadius: _D.r18,
-        border: Border.all(color: _D.border, width: 0.5),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          stops: [0.0, 0.6, 1.0],
+          colors: [Color(0xFFFFFFFF), Color(0xFFFFFDF7), Color(0xFFFDF8ED)],
+        ),
+        borderRadius: _T.r24,
+        border: Border.all(color: _T.amberBdr, width: 0.75),
+        boxShadow: [
+          BoxShadow(color: _T.amber.withOpacity(0.1),    blurRadius: 32, offset: const Offset(0, 10)),
+          const BoxShadow(color: Color(0x07000000), blurRadius: 16, offset: Offset(0, 4)),
+        ],
       ),
       clipBehavior: Clip.hardEdge,
       child: Stack(children: [
-        // Subtle amber glow top-right
+        // Ambient glow
         Positioned(
-          top: -50,
-          right: -50,
+          top: -80, right: -80,
           child: AnimatedBuilder(
             animation: pulse,
             builder: (_, __) => Container(
-              width: 180,
-              height: 180,
+              width: 240, height: 240,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(colors: [
-                  _D.amber.withOpacity(0.05 + 0.03 * pulse.value),
+                  _T.amber.withOpacity(0.05 + 0.04 * pulse.value),
                   Colors.transparent,
                 ]),
               ),
             ),
           ),
         ),
+        // Dot texture
+        Positioned.fill(child: CustomPaint(painter: _DotTexture())),
 
         Padding(
-          padding: const EdgeInsets.all(22),
+          padding: const EdgeInsets.all(24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
             // Header row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(children: [
-                  Container(
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      color: _D.amberBg,
-                      borderRadius: const BorderRadius.all(Radius.circular(7)),
-                    ),
-                    child: const Icon(Icons.currency_bitcoin, color: _D.amber, size: 14),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Row(children: [
+                Container(
+                  width: 30, height: 30,
+                  decoration: BoxDecoration(
+                    color: _T.amberBg,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: _T.amberBdr, width: 0.75),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'BTC BALANCE',
-                    style: GoogleFonts.dmSans(
-                      color: _D.sub,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.4,
-                    ),
-                  ),
-                ]),
-                Row(children: [
-                  if (isBoostActive) _Pill('2× BOOST', _D.amber, _D.amberBg, _D.amberDeep),
-                  if (isBoostActive && isSessionActive) const SizedBox(width: 5),
-                  if (isSessionActive) _Pill('MINING', _D.green, _D.greenBg, _D.greenDeep),
-                ]),
-              ],
-            ),
+                  child: const Icon(Icons.currency_bitcoin, color: _T.amber, size: 15),
+                ),
+                const SizedBox(width: 10),
+                Text('BTC BALANCE', style: _label(size: 10, weight: FontWeight.w600, color: _T.inkMid, letterSpacing: 1.6)),
+              ]),
+              Row(children: [
+                if (isBoostActive)
+                  _StatusPill(label: '2× BOOST', color: _T.amber, bg: _T.amberBg, border: _T.amberBdr, textColor: _T.amberText),
+                if (isBoostActive && isSessionActive) const SizedBox(width: 6),
+                if (isSessionActive)
+                  _StatusPill(label: 'LIVE', color: _T.green, bg: _T.greenBg, border: _T.greenBdr, textColor: _T.greenText),
+              ]),
+            ]),
 
-            const SizedBox(height: 18),
+            const SizedBox(height: 26),
 
-            // Balance
+            // Balance display
             Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text(
                 intPart,
-                style: GoogleFonts.dmMono(
-                  fontSize: 48,
-                  fontWeight: FontWeight.w600,
-                  color: _D.text,
-                  height: 1,
-                  letterSpacing: -2,
+                style: GoogleFonts.dmSans(
+                  fontSize: 52, fontWeight: FontWeight.w700,
+                  color: _T.ink, height: 1.0, letterSpacing: -2.0,
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.only(bottom: 5),
+                padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
                   decPart,
-                  style: GoogleFonts.dmMono(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w500,
-                    color: _D.amber,
-                    height: 1,
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 20, fontWeight: FontWeight.w500,
+                    color: _T.amber, height: 1.0, letterSpacing: -0.3,
                   ),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.only(bottom: 8, left: 7),
-                child: Text(
-                  'BTC',
-                  style: GoogleFonts.dmSans(
-                    color: _D.sub,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.3,
-                  ),
-                ),
+                padding: const EdgeInsets.only(bottom: 9, left: 8),
+                child: Text('BTC', style: _label(size: 12, weight: FontWeight.w600, color: _T.inkMid, letterSpacing: 1.0)),
               ),
             ]),
 
-            const SizedBox(height: 4),
+            const SizedBox(height: 5),
             Text(
               worthUsd != null ? '≈ \$${worthUsd!.toStringAsFixed(2)} USD' : '≈ — USD',
-              style: GoogleFonts.dmSans(color: _D.sub, fontSize: 12),
+              style: _label(size: 12, color: _T.inkMid),
             ),
 
+            const SizedBox(height: 22),
+            Container(height: 0.75, color: _T.borderSub),
             const SizedBox(height: 18),
-            Container(height: 0.5, color: _D.border),
-            const SizedBox(height: 14),
 
-            // Footer: hashrate + timer
+            // Footer row
             Row(children: [
-              _PulsingDot(),
+              _PulseDot(),
               const SizedBox(width: 8),
               Text(
                 '${btcPerMin.toStringAsFixed(8)} BTC/min',
-                style: GoogleFonts.dmMono(
-                  color: _D.green,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: _mono(size: 11, weight: FontWeight.w500, color: _T.green),
               ),
               const Spacer(),
               if (isSessionActive) ...[
-                const Icon(Icons.timer_outlined, color: _D.sub, size: 12),
-                const SizedBox(width: 4),
+                Icon(Icons.timer_outlined, color: _T.inkFaint, size: 12),
+                const SizedBox(width: 5),
                 Text(
                   '${sessionTimeLeft.inMinutes}:${(sessionTimeLeft.inSeconds % 60).toString().padLeft(2, '0')}',
-                  style: GoogleFonts.dmMono(color: _D.sub, fontSize: 11),
+                  style: _mono(size: 11, color: _T.inkMid),
                 ),
               ],
             ]),
@@ -722,59 +672,63 @@ class _BalanceHero extends StatelessWidget {
   }
 }
 
-class _Pill extends StatelessWidget {
+// ─── Dot texture painter ──────────────────────────────────────────────────────
+class _DotTexture extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = const Color(0xFF000000).withOpacity(0.022);
+    const step = 18.0;
+    for (double x = 0; x < size.width; x += step) {
+      for (double y = 0; y < size.height; y += step) {
+        canvas.drawCircle(Offset(x, y), 0.7, paint);
+      }
+    }
+  }
+  @override
+  bool shouldRepaint(_) => false;
+}
+
+// ─── Status pill ──────────────────────────────────────────────────────────────
+class _StatusPill extends StatelessWidget {
   final String label;
-  final Color accent;
-  final Color bg;
-  final Color textColor;
-  const _Pill(this.label, this.accent, this.bg, this.textColor);
+  final Color color, bg, border, textColor;
+  const _StatusPill({required this.label, required this.color, required this.bg, required this.border, required this.textColor});
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
     decoration: BoxDecoration(
       color: bg,
-      borderRadius: const BorderRadius.all(Radius.circular(5)),
-      border: Border.all(color: accent.withOpacity(0.25), width: 0.5),
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: border, width: 0.75),
     ),
-    child: Text(
-      label,
-      style: GoogleFonts.dmSans(
-        color: textColor,
-        fontSize: 8,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.8,
-      ),
-    ),
+    child: Text(label, style: _label(size: 8, weight: FontWeight.w700, color: textColor, letterSpacing: 0.9)),
   );
 }
 
-class _PulsingDot extends StatefulWidget {
+// ─── Pulse dot ────────────────────────────────────────────────────────────────
+class _PulseDot extends StatefulWidget {
   @override
-  State<_PulsingDot> createState() => _PulsingDotState();
+  State<_PulseDot> createState() => _PulseDotState();
 }
-
-class _PulsingDotState extends State<_PulsingDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-  AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
-    ..repeat(reverse: true);
-
-  @override
-  void dispose() { _c.dispose(); super.dispose(); }
+class _PulseDotState extends State<_PulseDot> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this, duration: const Duration(milliseconds: 1300),
+  )..repeat(reverse: true);
+  @override void dispose() { _c.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _c,
     builder: (_, __) => Container(
-      width: 6,
-      height: 6,
+      width: 7, height: 7,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: _D.green,
+        color: _T.green,
         boxShadow: [BoxShadow(
-          color: _D.green.withOpacity(0.25 + 0.35 * _c.value),
-          blurRadius: 4 + 4 * _c.value,
+          color: _T.green.withOpacity(0.2 + 0.4 * _c.value),
+          blurRadius: 4 + 6 * _c.value,
+          spreadRadius: _c.value * 0.5,
         )],
       ),
     ),
@@ -789,35 +743,37 @@ class _MineCTA extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg      = isActive ? _D.greenBg    : _D.amberBg;
-    final fg      = isActive ? _D.greenDeep  : _D.amberDeep;
-    final border  = isActive ? _D.green.withOpacity(0.2) : _D.amberBorder;
-    final icon    = isActive ? Icons.bolt_rounded : Icons.play_arrow_rounded;
-    final label   = isActive ? 'Session running — View farm' : 'Start mining session';
+    final bg     = isActive ? _T.greenBg   : _T.amberBg;
+    final border = isActive ? _T.greenBdr  : _T.amberBdr;
+    final ic     = isActive ? _T.green     : _T.amber;
+    final tc     = isActive ? _T.greenText : _T.amberText;
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 50,
+        height: 56,
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: _D.r14,
-          border: Border.all(color: border, width: 0.5),
+          borderRadius: _T.r16,
+          border: Border.all(color: border, width: 0.75),
+          boxShadow: [BoxShadow(color: ic.withOpacity(0.09), blurRadius: 16, offset: const Offset(0, 4))],
         ),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, color: fg, size: 18),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: GoogleFonts.dmSans(
-              color: fg,
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              letterSpacing: -0.2,
+          Container(
+            width: 30, height: 30,
+            decoration: BoxDecoration(
+              color: ic.withOpacity(0.13),
+              borderRadius: BorderRadius.circular(9),
             ),
+            child: Icon(isActive ? Icons.bolt_rounded : Icons.play_arrow_rounded, color: ic, size: 16),
           ),
-          const SizedBox(width: 6),
-          Icon(Icons.arrow_forward_rounded, color: fg.withOpacity(0.4), size: 14),
+          const SizedBox(width: 10),
+          Text(
+            isActive ? 'Session running — View farm' : 'Start mining session',
+            style: _label(size: 14, weight: FontWeight.w600, color: tc, letterSpacing: -0.1),
+          ),
+          const SizedBox(width: 8),
+          Icon(Icons.arrow_forward_rounded, color: ic.withOpacity(0.4), size: 15),
         ]),
       ),
     );
@@ -827,93 +783,80 @@ class _MineCTA extends StatelessWidget {
 // ─── Stat card ────────────────────────────────────────────────────────────────
 class _StatCard extends StatelessWidget {
   final IconData icon;
-  final Color iconBg;
-  final Color iconColor;
-  final String label;
-  final String value;
+  final Color iconColor, iconBg, iconBdr;
+  final String label, value;
   final bool mono;
 
   const _StatCard({
-    required this.icon,
-    required this.iconBg,
-    required this.iconColor,
-    required this.label,
-    required this.value,
+    required this.icon, required this.iconColor, required this.iconBg,
+    required this.iconBdr, required this.label, required this.value,
     this.mono = false,
   });
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(14),
-    decoration: _cardDeco(),
+    padding: const EdgeInsets.all(16),
+    decoration: _card(),
     child: Row(children: [
       Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(color: iconBg, borderRadius: _D.r10),
-        child: Icon(icon, color: iconColor, size: 17),
-      ),
-      const SizedBox(width: 10),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(
-          label,
-          style: GoogleFonts.dmSans(color: _D.sub, fontSize: 10, fontWeight: FontWeight.w500),
+        width: 40, height: 40,
+        decoration: BoxDecoration(
+          color: iconBg,
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: iconBdr, width: 0.75),
         ),
-        const SizedBox(height: 2),
+        child: Icon(icon, color: iconColor, size: 18),
+      ),
+      const SizedBox(width: 12),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: _label(size: 11, color: _T.inkMid)),
+        const SizedBox(height: 4),
         Text(
           value,
-          style: mono
-              ? GoogleFonts.dmMono(color: _D.text, fontSize: 12, fontWeight: FontWeight.w500)
-              : GoogleFonts.dmSans(color: _D.text, fontSize: 13, fontWeight: FontWeight.w600),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          style: mono ? _mono(size: 12, weight: FontWeight.w600) : _label(size: 13, weight: FontWeight.w700),
+          maxLines: 1, overflow: TextOverflow.ellipsis,
         ),
       ])),
     ]),
   );
 }
 
-// ─── Quick actions ────────────────────────────────────────────────────────────
-class _QuickActions extends StatelessWidget {
+// ─── Quick actions row ────────────────────────────────────────────────────────
+class _QuickActionsRow extends StatelessWidget {
   final BuildContext context;
-  const _QuickActions({required this.context});
+  const _QuickActionsRow({required this.context});
 
   @override
   Widget build(BuildContext ctx) {
     final items = [
-      (Icons.account_balance_wallet_outlined, 'Wallet',   _D.blue,   _D.blueBg,   '/profile'),
-      (Icons.payments_outlined,               'Withdraw', _D.green,  _D.greenBg,  '/profile'),
-      (Icons.group_add_outlined,              'Invite',   _D.purple, _D.purpleBg, '/profile'),
-      (Icons.show_chart_rounded,              'Stats',    _D.amber,  _D.amberBg,  '/farm'),
+      (Icons.account_balance_wallet_outlined, 'Wallet',   _T.blue,   _T.blueBg,   _T.blueBdr,   '/profile'),
+      (Icons.payments_outlined,               'Withdraw', _T.green,  _T.greenBg,  _T.greenBdr,  '/profile'),
+      (Icons.group_add_outlined,              'Invite',   _T.violet, _T.violetBg, _T.violetBdr, '/profile'),
+      (Icons.show_chart_rounded,              'Stats',    _T.amber,  _T.amberBg,  _T.amberBdr,  '/farm'),
     ];
-
     return Row(
       children: List.generate(items.length, (i) {
-        final a = items[i];
+        final item = items[i];
         return Expanded(
           child: Padding(
-            padding: EdgeInsets.only(right: i < items.length - 1 ? 8 : 0),
+            padding: EdgeInsets.only(right: i < items.length - 1 ? _T.gap : 0),
             child: GestureDetector(
-              onTap: () => Navigator.pushNamed(context, a.$5),
+              onTap: () => Navigator.pushNamed(context, item.$6),
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: _cardDeco(),
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                decoration: _card(radius: _T.r16),
                 child: Column(children: [
                   Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(color: a.$4, borderRadius: _D.r8),
-                    child: Icon(a.$1, color: a.$3, size: 16),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    a.$2,
-                    style: GoogleFonts.dmSans(
-                      color: _D.text,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                    width: 38, height: 38,
+                    decoration: BoxDecoration(
+                      color: item.$4,
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(color: item.$5, width: 0.75),
                     ),
+                    child: Icon(item.$1, color: item.$3, size: 17),
                   ),
+                  const SizedBox(height: 10),
+                  Text(item.$2, style: _label(size: 11, weight: FontWeight.w600)),
                 ]),
               ),
             ),
@@ -924,131 +867,108 @@ class _QuickActions extends StatelessWidget {
   }
 }
 
-// ─── Comeback card ────────────────────────────────────────────────────────────
-class _ComebackCard extends StatelessWidget {
+// ─── Comeback banner ──────────────────────────────────────────────────────────
+class _ComebackBanner extends StatelessWidget {
   final ComebackBonusService comeback;
   final GameStateService game;
-  const _ComebackCard({required this.comeback, required this.game});
+  const _ComebackBanner({required this.comeback, required this.game});
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: _cardDeco(borderColor: _D.amberBorder),
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+    decoration: _card(
+      bg: _T.amberBg, border: _T.amberBdr,
+      shadows: [BoxShadow(color: _T.amber.withOpacity(0.12), blurRadius: 24, offset: const Offset(0, 6))],
+    ),
     child: Row(children: [
       const Text('👋', style: TextStyle(fontSize: 26)),
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Welcome back!',
-            style: GoogleFonts.dmSans(color: _D.text, fontWeight: FontWeight.w600, fontSize: 14)),
-        Text(
-          '+${ComebackBonusService.bonusBtc.toStringAsFixed(5)} BTC waiting for you',
-          style: GoogleFonts.dmSans(color: _D.amberDeep, fontSize: 12, fontWeight: FontWeight.w500),
-        ),
+        Text('Welcome back!', style: _label(size: 14, weight: FontWeight.w700, color: _T.amberText)),
+        const SizedBox(height: 2),
+        Text('+${ComebackBonusService.bonusBtc.toStringAsFixed(5)} BTC waiting for you',
+            style: _label(size: 12, weight: FontWeight.w500, color: _T.amber)),
       ])),
-      _ChipBtn(
+      const SizedBox(width: 12),
+      _ActionChip(
         label: 'Claim',
-        color: _D.amberDeep,
-        bg: _D.amberBg,
-        borderColor: _D.amberBorder,
+        textColor: _T.amberText,
+        bg: _T.amber.withOpacity(0.12),
+        border: _T.amberBdr,
         onTap: () async {
           await game.grantDirectBtc(ComebackBonusService.bonusBtc);
           await comeback.markClaimed();
-          if (context.mounted) _toast(context, '🎁 Welcome back bonus claimed!');
+          if (context.mounted) _showToast(context, '🎁 Welcome back bonus claimed!');
         },
       ),
     ]),
   );
 }
 
-// ─── Shared bonus mini card ───────────────────────────────────────────────────
+// ─── Bonus mini card ──────────────────────────────────────────────────────────
 class _BonusMini extends StatelessWidget {
   final IconData icon;
-  final Color iconColor;
-  final Color iconBg;
-  final String title;
-  final String subtitle;
+  final Color iconColor, iconBg, iconBdr;
+  final String title, subtitle;
   final String? badge;
-  final Color? badgeColor;
-  final Color? badgeBg;
-  final Color? badgeText;
+  final Color? badgeBg, badgeBdr, badgeTextColor;
   final double? progress;
   final Color? progressColor;
   final VoidCallback? onTap;
 
   const _BonusMini({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBg,
-    required this.title,
-    required this.subtitle,
-    this.badge,
-    this.badgeColor,
-    this.badgeBg,
-    this.badgeText,
-    this.progress,
-    this.progressColor,
-    this.onTap,
+    required this.icon, required this.iconColor, required this.iconBg, required this.iconBdr,
+    required this.title, required this.subtitle,
+    this.badge, this.badgeBg, this.badgeBdr, this.badgeTextColor,
+    this.progress, this.progressColor, this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final hasAction = badge != null && onTap != null;
+    final isActive = badge != null && onTap != null;
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: _cardDeco(
-          borderColor: hasAction ? (badgeColor ?? _D.amber).withOpacity(0.3) : null,
-        ),
+        padding: const EdgeInsets.all(15),
+        decoration: _card(border: isActive ? (badgeBdr ?? _T.amberBdr) : _T.border),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(color: iconBg, borderRadius: _D.r8),
-              child: Icon(icon, color: iconColor, size: 15),
+              width: 34, height: 34,
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: iconBdr, width: 0.75),
+              ),
+              child: Icon(icon, color: iconColor, size: 16),
             ),
             if (badge != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: badgeBg ?? _D.amberBg,
-                  borderRadius: const BorderRadius.all(Radius.circular(5)),
-                  border: Border.all(
-                    color: (badgeColor ?? _D.amber).withOpacity(0.25),
-                    width: 0.5,
-                  ),
+                  color: badgeBg ?? _T.amberBg,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: badgeBdr ?? _T.amberBdr, width: 0.75),
                 ),
-                child: Text(
-                  badge!,
-                  style: GoogleFonts.dmSans(
-                    color: badgeText ?? _D.amberDeep,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
-                ),
+                child: Text(badge!, style: _label(
+                  size: 8, weight: FontWeight.w700,
+                  color: badgeTextColor ?? _T.amberText, letterSpacing: 0.6,
+                )),
               ),
           ]),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: GoogleFonts.dmSans(color: _D.text, fontSize: 13, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: GoogleFonts.dmSans(color: _D.sub, fontSize: 11),
-          ),
+          const SizedBox(height: 12),
+          Text(title, style: _label(size: 13, weight: FontWeight.w600)),
+          const SizedBox(height: 3),
+          Text(subtitle, style: _label(size: 11, color: _T.inkMid)),
           if (progress != null) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             ClipRRect(
-              borderRadius: const BorderRadius.all(Radius.circular(2)),
+              borderRadius: BorderRadius.circular(3),
               child: LinearProgressIndicator(
                 value: progress!.clamp(0.0, 1.0),
                 minHeight: 3,
-                backgroundColor: _D.borderSm,
-                valueColor: AlwaysStoppedAnimation(progressColor ?? _D.amber),
+                backgroundColor: _T.chipBg,
+                valueColor: AlwaysStoppedAnimation(progressColor ?? _T.amber),
               ),
             ),
           ],
@@ -1058,30 +978,24 @@ class _BonusMini extends StatelessWidget {
   }
 }
 
-// ─── Concrete bonus cards ─────────────────────────────────────────────────────
+// ─── Individual bonus cards ───────────────────────────────────────────────────
 class _DailyBoostCard extends StatelessWidget {
   final DailyBoostService dailyBoost;
   const _DailyBoostCard({required this.dailyBoost});
 
   @override
   Widget build(BuildContext context) {
-    final can = dailyBoost.canClaim;
+    final ready = dailyBoost.canClaim;
     return _BonusMini(
       icon: Icons.bolt_rounded,
-      iconColor: _D.amber,
-      iconBg: _D.amberBg,
-      title: 'Daily boost',
-      subtitle: can ? '2× speed ready!' : 'Resets in 24h',
-      badge: can ? 'READY' : null,
-      badgeColor: _D.amber,
-      badgeBg: _D.amberBg,
-      badgeText: _D.amberDeep,
-      onTap: can
-          ? () async {
+      iconColor: _T.amber, iconBg: _T.amberBg, iconBdr: _T.amberBdr,
+      title: 'Daily boost', subtitle: ready ? '2× speed ready!' : 'Resets in 24h',
+      badge: ready ? 'READY' : null,
+      badgeBg: _T.amberBg, badgeBdr: _T.amberBdr, badgeTextColor: _T.amberText,
+      onTap: ready ? () async {
         final ok = await dailyBoost.claim();
-        if (ok && context.mounted) _toast(context, '⚡ 2× boost activated!');
-      }
-          : null,
+        if (ok && context.mounted) _showToast(context, '⚡ 2× boost activated!');
+      } : null,
     );
   }
 }
@@ -1094,30 +1008,25 @@ class _LoginStreakCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final days = loginStreak.streakDays;
-    final can  = loginStreak.canClaimStreak3 || loginStreak.canClaimStreak7;
+    final can = loginStreak.canClaimStreak3 || loginStreak.canClaimStreak7;
     return _BonusMini(
       icon: Icons.local_fire_department_rounded,
-      iconColor: _D.red,
-      iconBg: _D.redBg,
+      iconColor: _T.rose, iconBg: _T.roseBg, iconBdr: _T.roseBdr,
       title: 'Login streak',
       subtitle: days == 0 ? 'Come back tomorrow' : '$days day${days == 1 ? '' : 's'} 🔥',
       badge: can ? 'CLAIM' : null,
-      badgeColor: _D.green,
-      badgeBg: _D.greenBg,
-      badgeText: _D.greenDeep,
-      onTap: can
-          ? () async {
+      badgeBg: _T.greenBg, badgeBdr: _T.greenBdr, badgeTextColor: _T.greenText,
+      onTap: can ? () async {
         if (loginStreak.canClaimStreak7) {
           await game.grantDirectBtc(0.00003);
           await loginStreak.markStreak7Claimed();
-          if (context.mounted) _toast(context, '🔥 7-day reward!');
+          if (context.mounted) _showToast(context, '🔥 7-day reward!');
         } else {
           await game.grantDirectBtc(0.00001);
           await loginStreak.markStreak3Claimed();
-          if (context.mounted) _toast(context, '🔥 3-day reward!');
+          if (context.mounted) _showToast(context, '🔥 3-day reward!');
         }
-      }
-          : null,
+      } : null,
     );
   }
 }
@@ -1129,27 +1038,24 @@ class _WeeklyChallengeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = weeklyChallenge.progressThisWeek(game.totalSessionsStarted);
-    final can      = weeklyChallenge.canClaim(game.totalSessionsStarted);
+    final prog = weeklyChallenge.progressThisWeek(game.totalSessionsStarted);
+    final can  = weeklyChallenge.canClaim(game.totalSessionsStarted);
     return _BonusMini(
       icon: Icons.emoji_events_rounded,
-      iconColor: _D.purple,
-      iconBg: _D.purpleBg,
+      iconColor: _T.violet, iconBg: _T.violetBg, iconBdr: _T.violetBdr,
       title: 'Weekly',
-      subtitle: '$progress/${WeeklyChallengeService.targetSessions} sessions',
-      badge: can ? 'CLAIM' : '${progress}/${WeeklyChallengeService.targetSessions}',
-      badgeColor: can ? _D.green : _D.purple,
-      badgeBg: can ? _D.greenBg : _D.purpleBg,
-      badgeText: can ? _D.greenDeep : _D.purpleDeep,
-      progress: progress / WeeklyChallengeService.targetSessions,
-      progressColor: _D.purple,
-      onTap: can
-          ? () async {
+      subtitle: '$prog/${WeeklyChallengeService.targetSessions} sessions',
+      badge: can ? 'CLAIM' : '$prog/${WeeklyChallengeService.targetSessions}',
+      badgeBg: can ? _T.greenBg : _T.violetBg,
+      badgeBdr: can ? _T.greenBdr : _T.violetBdr,
+      badgeTextColor: can ? _T.greenText : _T.violetText,
+      progress: prog / WeeklyChallengeService.targetSessions,
+      progressColor: _T.violet,
+      onTap: can ? () async {
         await game.grantDirectBtc(WeeklyChallengeService.rewardBtc);
         await weeklyChallenge.markClaimed();
-        if (context.mounted) _toast(context, '🏆 Weekly reward!');
-      }
-          : null,
+        if (context.mounted) _showToast(context, '🏆 Weekly reward!');
+      } : null,
     );
   }
 }
@@ -1164,25 +1070,21 @@ class _GoalsCard extends StatelessWidget {
     final can = goals.canClaimDaily || goals.canClaimWeekly;
     return _BonusMini(
       icon: Icons.flag_rounded,
-      iconColor: _D.blue,
-      iconBg: _D.blueBg,
+      iconColor: _T.blue, iconBg: _T.blueBg, iconBdr: _T.blueBdr,
       title: 'Daily goals',
       subtitle: '${(goals.dailyProgressPercent * 100).toStringAsFixed(0)}% mined',
       badge: can ? 'CLAIM' : '${(goals.dailyProgressPercent * 100).toStringAsFixed(0)}%',
-      badgeColor: can ? _D.green : _D.blue,
-      badgeBg: can ? _D.greenBg : _D.blueBg,
-      badgeText: can ? _D.greenDeep : _D.blueDeep,
-      progress: goals.dailyProgressPercent,
-      progressColor: _D.blue,
-      onTap: can
-          ? () async {
+      badgeBg: can ? _T.greenBg : _T.blueBg,
+      badgeBdr: can ? _T.greenBdr : _T.blueBdr,
+      badgeTextColor: can ? _T.greenText : _T.blueText,
+      progress: goals.dailyProgressPercent, progressColor: _T.blue,
+      onTap: can ? () async {
         if (goals.canClaimDaily) {
           await game.grantDirectBtc(GoalsService.dailyRewardBtc);
           await goals.claimDaily();
-          if (context.mounted) _toast(context, '🎯 Daily goal reward!');
+          if (context.mounted) _showToast(context, '🎯 Daily goal reward!');
         }
-      }
-          : null,
+      } : null,
     );
   }
 }
@@ -1194,14 +1096,9 @@ class _SpinCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _BonusMini(
     icon: Icons.casino_outlined,
-    iconColor: _D.purple,
-    iconBg: _D.purpleBg,
-    title: 'Lucky spin',
-    subtitle: 'Try your luck',
-    badge: 'SPIN',
-    badgeColor: _D.purple,
-    badgeBg: _D.purpleBg,
-    badgeText: _D.purpleDeep,
+    iconColor: _T.violet, iconBg: _T.violetBg, iconBdr: _T.violetBdr,
+    title: 'Lucky spin', subtitle: 'Try your luck',
+    badge: 'SPIN', badgeBg: _T.violetBg, badgeBdr: _T.violetBdr, badgeTextColor: _T.violetText,
     onTap: () => Navigator.pushNamed(context, '/spin'),
   );
 }
@@ -1213,14 +1110,9 @@ class _ReferralCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _BonusMini(
     icon: Icons.people_outline_rounded,
-    iconColor: _D.green,
-    iconBg: _D.greenBg,
-    title: 'Referrals',
-    subtitle: '${referral.friends} friends joined',
-    badge: 'INVITE',
-    badgeColor: _D.green,
-    badgeBg: _D.greenBg,
-    badgeText: _D.greenDeep,
+    iconColor: _T.green, iconBg: _T.greenBg, iconBdr: _T.greenBdr,
+    title: 'Referrals', subtitle: '${referral.friends} friends joined',
+    badge: 'INVITE', badgeBg: _T.greenBg, badgeBdr: _T.greenBdr, badgeTextColor: _T.greenText,
     onTap: () => Navigator.pushNamed(context, '/profile'),
   );
 }
@@ -1238,56 +1130,53 @@ class _SeasonCard extends StatelessWidget {
     final progress = (season.xp / next).clamp(0.0, 1.0);
 
     return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: _cardDeco(),
+      padding: const EdgeInsets.all(20),
+      decoration: _card(
+        bg: _T.amberBg, border: _T.amberBdr,
+        shadows: [BoxShadow(color: _T.amber.withOpacity(0.1), blurRadius: 24, offset: const Offset(0, 6))],
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(color: _D.amberBg, borderRadius: _D.r10),
-            child: const Icon(Icons.emoji_events_rounded, color: _D.amber, size: 18),
+            width: 42, height: 42,
+            decoration: BoxDecoration(
+              color: _T.amber.withOpacity(0.13),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _T.amberBdr, width: 0.75),
+            ),
+            child: const Icon(Icons.emoji_events_rounded, color: _T.amber, size: 20),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(
-              'Season ${season.seasonId}',
-              style: GoogleFonts.dmSans(color: _D.text, fontWeight: FontWeight.w600, fontSize: 14),
-            ),
-            Text(
-              '${season.xp} / $next XP',
-              style: GoogleFonts.dmSans(color: _D.sub, fontSize: 11),
-            ),
+            Text('Season ${season.seasonId}', style: _label(size: 14, weight: FontWeight.w700)),
+            const SizedBox(height: 2),
+            Text('${season.xp} / $next XP', style: _label(size: 12, color: _T.inkMid)),
           ])),
-          Text(
-            '${(progress * 100).toStringAsFixed(0)}%',
-            style: GoogleFonts.dmSans(color: _D.amber, fontWeight: FontWeight.w600, fontSize: 14),
-          ),
+          Text('${(progress * 100).toStringAsFixed(0)}%',
+              style: _label(size: 18, weight: FontWeight.w700, color: _T.amber)),
         ]),
-        const SizedBox(height: 14),
+        const SizedBox(height: 18),
         ClipRRect(
-          borderRadius: const BorderRadius.all(Radius.circular(3)),
+          borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value: progress,
-            minHeight: 5,
-            backgroundColor: _D.borderSm,
-            valueColor: const AlwaysStoppedAnimation(_D.amber),
+            value: progress, minHeight: 6,
+            backgroundColor: _T.amber.withOpacity(0.14),
+            valueColor: const AlwaysStoppedAnimation(_T.amber),
           ),
         ),
-        // Claimable rewards
         ...List.generate(SeasonService.freeMilestones.length, (i) {
           if (!season.canClaimFree(i)) return const SizedBox.shrink();
           return Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: _ChipBtn(
+            padding: const EdgeInsets.only(top: 14),
+            child: _ActionChip(
               label: '${SeasonService.freeMilestones[i]} XP → +${SeasonService.freeRewardsBtc[i].toStringAsFixed(5)} BTC',
-              color: _D.amberDeep,
-              bg: _D.amberBg,
-              borderColor: _D.amberBorder,
+              textColor: _T.amberText,
+              bg: _T.amber.withOpacity(0.1),
+              border: _T.amberBdr,
               onTap: () async {
                 await game.grantDirectBtc(SeasonService.freeRewardsBtc[i]);
                 await season.claimFreeReward(i);
-                if (context.mounted) _toast(context, '🏆 Season reward!');
+                if (context.mounted) _showToast(context, '🏆 Season reward!');
               },
             ),
           );
@@ -1305,47 +1194,41 @@ class _EnergyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = (energy.heat / 100).clamp(0.0, 1.0);
-    final heatColor = Color.lerp(_D.green, _D.red, t)!;
+    final heatColor = Color.lerp(_T.green, _T.rose, t)!;
+
     return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: _cardDeco(),
+      padding: const EdgeInsets.all(18),
+      decoration: _card(),
       child: Row(children: [
         Container(
-          width: 36,
-          height: 36,
+          width: 44, height: 44,
           decoration: BoxDecoration(
-            color: heatColor.withOpacity(0.1),
-            borderRadius: _D.r10,
+            color: heatColor.withOpacity(0.09),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: heatColor.withOpacity(0.22), width: 0.75),
           ),
-          child: Icon(Icons.thermostat_rounded, color: heatColor, size: 17),
+          child: Icon(Icons.thermostat_rounded, color: heatColor, size: 20),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 14),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(
-            'Energy & cooling',
-            style: GoogleFonts.dmSans(color: _D.text, fontWeight: FontWeight.w600, fontSize: 13),
-          ),
-          const SizedBox(height: 5),
+          Text('Energy & cooling', style: _label(size: 13, weight: FontWeight.w600)),
+          const SizedBox(height: 8),
           ClipRRect(
-            borderRadius: const BorderRadius.all(Radius.circular(2)),
+            borderRadius: BorderRadius.circular(3),
             child: LinearProgressIndicator(
-              value: t,
-              minHeight: 4,
-              backgroundColor: _D.borderSm,
+              value: t, minHeight: 4,
+              backgroundColor: _T.chipBg,
               valueColor: AlwaysStoppedAnimation(heatColor),
             ),
           ),
         ])),
-        const SizedBox(width: 12),
+        const SizedBox(width: 16),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(
-            '${energy.heat.toStringAsFixed(0)}°',
-            style: GoogleFonts.dmMono(color: heatColor, fontWeight: FontWeight.w600, fontSize: 16),
-          ),
-          Text(
-            '×${energy.efficiencyMultiplier.toStringAsFixed(2)}',
-            style: GoogleFonts.dmMono(color: _D.sub, fontSize: 11),
-          ),
+          Text('${energy.heat.toStringAsFixed(0)}°',
+              style: _mono(size: 22, weight: FontWeight.w600, color: heatColor)),
+          const SizedBox(height: 2),
+          Text('×${energy.efficiencyMultiplier.toStringAsFixed(2)}',
+              style: _mono(size: 11, color: _T.inkMid)),
         ]),
       ]),
     );
@@ -1359,51 +1242,44 @@ class _LocationsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: _cardDeco(),
+    padding: const EdgeInsets.all(18),
+    decoration: _card(),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(color: _D.blueBg, borderRadius: _D.r8),
-          child: const Icon(Icons.map_outlined, color: _D.blue, size: 15),
+          width: 34, height: 34,
+          decoration: BoxDecoration(
+            color: _T.blueBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _T.blueBdr, width: 0.75),
+          ),
+          child: const Icon(Icons.map_outlined, color: _T.blue, size: 16),
         ),
-        const SizedBox(width: 10),
-        Text(
-          'Mining locations',
-          style: GoogleFonts.dmSans(color: _D.text, fontWeight: FontWeight.w600, fontSize: 13),
-        ),
+        const SizedBox(width: 11),
+        Text('Mining locations', style: _label(size: 13, weight: FontWeight.w600)),
       ]),
-      const SizedBox(height: 12),
+      const SizedBox(height: 16),
       Wrap(
-        spacing: 6,
-        runSpacing: 6,
+        spacing: 8, runSpacing: 8,
         children: MiningLocations.all.map((loc) {
           final on = progression.unlockedLocations.contains(loc.id);
           return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
             decoration: BoxDecoration(
-              color: on ? _D.blueBg : _D.bg,
-              borderRadius: _D.r8,
-              border: Border.all(
-                color: on ? _D.blue.withOpacity(0.25) : _D.border,
-                width: 0.5,
-              ),
+              color: on ? _T.blueBg : _T.chipBg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: on ? _T.blueBdr : _T.borderSub, width: 0.75),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               if (on) ...[
-                const Icon(Icons.check_circle_rounded, color: _D.blue, size: 11),
-                const SizedBox(width: 4),
+                const Icon(Icons.check_circle_rounded, color: _T.blue, size: 12),
+                const SizedBox(width: 5),
               ],
-              Text(
-                loc.name,
-                style: GoogleFonts.dmSans(
-                  color: on ? _D.blueDeep : _D.sub,
-                  fontSize: 11,
-                  fontWeight: on ? FontWeight.w600 : FontWeight.w400,
-                ),
-              ),
+              Text(loc.name, style: _label(
+                size: 12,
+                weight: on ? FontWeight.w600 : FontWeight.w400,
+                color: on ? _T.blueText : _T.inkMid,
+              )),
             ]),
           );
         }).toList(),
@@ -1420,36 +1296,30 @@ class _DropCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: _D.amberBg,
-      borderRadius: _D.r14,
-      border: Border.all(color: _D.amberBorder, width: 0.5),
+    padding: const EdgeInsets.all(18),
+    decoration: _card(
+      bg: _T.amberBg, border: _T.amberBdr,
+      shadows: [BoxShadow(color: _T.amber.withOpacity(0.12), blurRadius: 20, offset: const Offset(0, 5))],
     ),
     child: Row(children: [
-      const Text('✨', style: TextStyle(fontSize: 24)),
+      const Text('✨', style: TextStyle(fontSize: 26)),
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(
-          'Hidden crypto block!',
-          style: GoogleFonts.dmSans(color: _D.amberDeep, fontWeight: FontWeight.w600, fontSize: 14),
-        ),
-        Text(
-          'Tap to collect bonus BTC',
-          style: GoogleFonts.dmSans(color: _D.sub, fontSize: 11),
-        ),
+        Text('Hidden crypto block!', style: _label(size: 14, weight: FontWeight.w700, color: _T.amberText)),
+        const SizedBox(height: 2),
+        Text('Tap to collect bonus BTC', style: _label(size: 12, color: _T.inkMid)),
       ])),
-      _ChipBtn(
+      const SizedBox(width: 12),
+      _ActionChip(
         label: 'Collect',
-        color: _D.amberDeep,
-        bg: _D.amber.withOpacity(0.15),
-        borderColor: _D.amberBorder,
+        textColor: _T.amberText,
+        bg: _T.amber.withOpacity(0.12),
+        border: _T.amberBdr,
         onTap: () async {
           final bonus = await drop.collect();
           if (bonus != null) await game.grantDirectBtc(bonus);
-          if (context.mounted) {
-            _toast(context, '+${(bonus ?? 0).toStringAsFixed(6)} BTC collected!');
-          }
+          if (context.mounted)
+            _showToast(context, '+${(bonus ?? 0).toStringAsFixed(6)} BTC collected!');
         },
       ),
     ]),
@@ -1464,27 +1334,25 @@ class _NewsCard extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
     onTap: () => Navigator.pushNamed(context, '/news'),
     child: Container(
-      padding: const EdgeInsets.all(14),
-      decoration: _cardDeco(),
+      padding: const EdgeInsets.all(16),
+      decoration: _card(),
       child: Row(children: [
         Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(color: _D.amberBg, borderRadius: _D.r10),
-          child: const Icon(Icons.article_outlined, color: _D.amber, size: 17),
+          width: 42, height: 42,
+          decoration: BoxDecoration(
+            color: _T.amberBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _T.amberBdr, width: 0.75),
+          ),
+          child: const Icon(Icons.article_outlined, color: _T.amber, size: 18),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 14),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(
-            'Latest Bitcoin news',
-            style: GoogleFonts.dmSans(color: _D.text, fontWeight: FontWeight.w600, fontSize: 13),
-          ),
-          Text(
-            'Stay updated on crypto markets',
-            style: GoogleFonts.dmSans(color: _D.sub, fontSize: 11),
-          ),
+          Text('Latest Bitcoin news', style: _label(size: 13, weight: FontWeight.w600)),
+          const SizedBox(height: 3),
+          Text('Stay updated on crypto markets', style: _label(size: 11, color: _T.inkMid)),
         ])),
-        const Icon(Icons.chevron_right_rounded, color: _D.hint, size: 18),
+        Icon(Icons.chevron_right_rounded, color: _T.inkFaint, size: 20),
       ]),
     ),
   );
@@ -1498,36 +1366,33 @@ class _WebsiteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final url     = adCfg.customTabUrl;
-    final display = url.length > 38 ? '${url.substring(0, 38)}…' : url;
+    final display = url.length > 36 ? '${url.substring(0, 36)}…' : url;
     return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: _cardDeco(),
+      padding: const EdgeInsets.all(16),
+      decoration: _card(),
       child: Row(children: [
         Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(color: _D.blueBg, borderRadius: _D.r10),
-          child: const Icon(Icons.open_in_browser_rounded, color: _D.blue, size: 17),
+          width: 42, height: 42,
+          decoration: BoxDecoration(
+            color: _T.blueBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _T.blueBdr, width: 0.75),
+          ),
+          child: const Icon(Icons.open_in_browser_rounded, color: _T.blue, size: 18),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 14),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(
-            'Open website',
-            style: GoogleFonts.dmSans(color: _D.text, fontWeight: FontWeight.w600, fontSize: 13),
-          ),
-          Text(
-            display,
-            style: GoogleFonts.dmSans(color: _D.sub, fontSize: 11),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          Text('Open website', style: _label(size: 13, weight: FontWeight.w600)),
+          const SizedBox(height: 3),
+          Text(display, style: _label(size: 11, color: _T.inkMid),
+              maxLines: 1, overflow: TextOverflow.ellipsis),
         ])),
         const SizedBox(width: 10),
-        _ChipBtn(
+        _ActionChip(
           label: 'Open',
-          color: _D.blueDeep,
-          bg: _D.blueBg,
-          borderColor: _D.blue.withOpacity(0.25),
+          textColor: _T.blueText,
+          bg: _T.blueBg,
+          border: _T.blueBdr,
           onTap: () => adCfg.openCustomTab(url),
         ),
       ]),
@@ -1535,60 +1400,45 @@ class _WebsiteCard extends StatelessWidget {
   }
 }
 
-// ─── Chip button ──────────────────────────────────────────────────────────────
-class _ChipBtn extends StatelessWidget {
+// ─── Action chip ──────────────────────────────────────────────────────────────
+class _ActionChip extends StatelessWidget {
   final String label;
-  final Color color;
-  final Color bg;
-  final Color borderColor;
+  final Color textColor, bg, border;
   final VoidCallback onTap;
 
-  const _ChipBtn({
-    required this.label,
-    required this.color,
-    required this.bg,
-    required this.borderColor,
-    required this.onTap,
+  const _ActionChip({
+    required this.label, required this.textColor,
+    required this.bg, required this.border, required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: _D.r8,
-        border: Border.all(color: borderColor, width: 0.5),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: border, width: 0.75),
       ),
-      child: Text(
-        label,
-        style: GoogleFonts.dmSans(
-          color: color,
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
-        ),
-      ),
+      child: Text(label, style: _label(size: 12, weight: FontWeight.w700, color: textColor)),
     ),
   );
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
-void _toast(BuildContext context, String msg) {
+void _showToast(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
-      content: Text(
-        msg,
-        style: GoogleFonts.dmSans(color: _D.text, fontWeight: FontWeight.w500, fontSize: 13),
-      ),
-      backgroundColor: _D.white,
+      content: Text(message, style: _label(size: 13, weight: FontWeight.w500, color: _T.ink)),
+      backgroundColor: _T.surface,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: _D.border, width: 0.5),
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: _T.border, width: 0.75),
       ),
       margin: const EdgeInsets.all(16),
-      elevation: 2,
+      elevation: 4,
     ),
   );
 }

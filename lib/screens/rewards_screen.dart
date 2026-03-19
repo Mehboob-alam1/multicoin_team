@@ -117,7 +117,7 @@ class RewardsScreen extends StatelessWidget {
                   ),
 
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                    padding: EdgeInsets.fromLTRB(AppTheme.pagePaddingH, 8, AppTheme.pagePaddingH, AppTheme.pageBottomPadding(context)),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
 

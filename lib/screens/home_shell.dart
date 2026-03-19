@@ -207,9 +207,14 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       if (isSubscription) {
         game.activatePremium(productId, durationDays);
       } else {
-        if (game.hasPurchasedOneTime(productId)) return;
+        if (!ShopProducts.isRepeatableFarmRigProduct(productId) &&
+            game.hasPurchasedOneTime(productId)) {
+          return;
+        }
         if (productId == 'season_pass') {
-          context.read<SeasonService>().unlockPremium();
+          game.applyOneTimePurchase(productId: productId).then((_) {
+            if (mounted) context.read<SeasonService>().unlockPremium();
+          });
           return;
         }
         if (p != null) {
@@ -587,13 +592,13 @@ class _FloatingNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 12),
+      padding: EdgeInsets.fromLTRB(AppTheme.pagePaddingH, 0, AppTheme.pagePaddingH, bottomInset + 12),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius + 8),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
           child: Container(
-            height: 64,
+            height: AppTheme.bottomNavHeight,
             decoration: BoxDecoration(
               color: _D.surface.withValues(alpha: 0.92),
               borderRadius: BorderRadius.circular(24),

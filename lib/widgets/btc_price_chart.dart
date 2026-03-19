@@ -337,16 +337,23 @@ class _ChartShell extends StatelessWidget {
         color: _D.white,
         borderRadius: _D.r14,
         border: Border.all(color: _D.border, width: 0.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            const headerHeight = 26.0;
+            const headerHeight = 28.0;
             const footerHeight = 18.0;
-            const gapAbove = 14.0;
-            const gapBelow = 8.0;
-            const paddingVertical = 26.0;
+            const gapAbove = 12.0;
+            const gapBelow = 10.0;
+            const paddingVertical = 30.0;
             final maxChartHeight = constraints.maxHeight.isFinite
                 ? (constraints.maxHeight - paddingVertical - headerHeight - footerHeight - gapAbove - gapBelow).clamp(60.0, 140.0)
                 : 140.0;
@@ -355,84 +362,121 @@ class _ChartShell extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Header ───────────────────────────────────────────────────
-                Row(children: [
-                  Container(
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(color: _D.amberBg, borderRadius: _D.r8),
-                    child: const Icon(Icons.show_chart_rounded, color: _D.amber, size: 14),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: GoogleFonts.dmSans(
-                      color: _D.sub,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.4,
+                // ── Header (flexible to avoid overflow) ───────────────────────
+                Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: _D.amberBg,
+                        borderRadius: _D.r8,
+                        border: Border.all(color: _D.amber.withValues(alpha: 0.3), width: 0.5),
+                      ),
+                      child: const Icon(Icons.show_chart_rounded, color: _D.amber, size: 15),
                     ),
-                  ),
-                  const Spacer(),
-                  if (price != null) ...[
-                    Text(
-                      '\$${price!.toStringAsFixed(0)}',
-                      style: GoogleFonts.dmMono(
-                        color: _D.text,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 18,
-                        letterSpacing: -0.5,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: GoogleFonts.dmSans(
+                          color: _D.sub,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.4,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     ),
-                    if (change != null) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: changeBg,
-                          borderRadius: _D.r8,
-                          border: Border.all(
-                            color: changeColor.withOpacity(0.2),
-                            width: 0.5,
+                    if (price != null)
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.attach_money, size: 16, color: _D.text),
+                              Text(
+                                price!.toStringAsFixed(0),
+                                style: GoogleFonts.dmMono(
+                                  color: _D.text,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                'USD',
+                                style: GoogleFonts.dmSans(
+                                  color: _D.sub,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 9,
+                                ),
+                              ),
+                              if (change != null) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: changeBg,
+                                    borderRadius: _D.r8,
+                                    border: Border.all(
+                                      color: changeColor.withOpacity(0.2),
+                                      width: 0.5,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(changeIcon, color: changeColor, size: 12),
+                                      Text(
+                                        '${change!.abs().toStringAsFixed(2)}%',
+                                        style: GoogleFonts.dmSans(
+                                          color: changeText,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(changeIcon, color: changeColor, size: 13),
-                          Text(
-                            '${change!.abs().toStringAsFixed(2)}%',
-                            style: GoogleFonts.dmSans(
-                              color: changeText,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ]),
                       ),
-                    ],
                   ],
-                ]),
+                ),
 
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
 
                 // ── Chart body (height adapts to avoid overflow) ─────────────
-                SizedBox(height: maxChartHeight, child: child),
+                ClipRRect(
+                  borderRadius: _D.r8,
+                  child: SizedBox(height: maxChartHeight, child: child),
+                ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
 
                 // ── Footer ───────────────────────────────────────────────────
-                Row(children: [
-                  const Icon(Icons.access_time_rounded, color: _D.hint, size: 11),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Last 30 days',
-                    style: GoogleFonts.dmSans(color: _D.hint, fontSize: 10),
-                  ),
-                  const Spacer(),
-                  Text(
-                    'CoinGecko',
-                    style: GoogleFonts.dmSans(color: _D.hint, fontSize: 10),
-                  ),
-                ]),
+                Row(
+                  children: [
+                    Icon(Icons.access_time_rounded, color: _D.hint, size: 12),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Last 30 days',
+                      style: GoogleFonts.dmSans(color: _D.hint, fontSize: 10),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'CoinGecko',
+                      style: GoogleFonts.dmSans(color: _D.hint, fontSize: 10),
+                    ),
+                  ],
+                ),
               ],
             );
           },

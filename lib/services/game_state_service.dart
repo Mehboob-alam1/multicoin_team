@@ -4,7 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/coin.dart';
 import '../models/farm_tier.dart';
 import '../models/mining_rig.dart';
+import '../config/mining_economy.dart';
 import '../models/player_data.dart';
+import '../models/shop_product.dart';
 import '../game_engine/mining_engine.dart';
 import 'background_mining_task.dart';
 import 'firebase_sync_service.dart';
@@ -89,7 +91,7 @@ class GameStateService extends ChangeNotifier {
     for (final id in _data.ownedRigIds) {
       final rig = MiningRigs.byId(id);
       if (rig == null || !rig.supportsCoin(coinId)) continue;
-      final baseRate = rig.rateForCoin(coinId);
+      final baseRate = rig.rateForCoin(coinId) * MiningEconomy.outputScale;
       if (baseRate <= 0) continue;
       sum += MiningEngine.effectiveRateForCoin(
         baseRateForCoin: baseRate,
@@ -129,11 +131,13 @@ class GameStateService extends ChangeNotifier {
     if (changed) notifyListeners();
   }
 
+  /// Permanent mining rate bonuses from one-time shop purchases. Stacks with session, premium, boost.
   double _oneTimeMiningMultiplier() {
     double m = 1.0;
     if (_purchasedOneTimeIds.contains('starter_pack')) m *= 1.05;
     if (_purchasedOneTimeIds.contains('satoshi_pack')) m *= 1.03;
     if (_purchasedOneTimeIds.contains('mega_pack')) m *= 1.15;
+    if (_purchasedOneTimeIds.contains('season_pass')) m *= 1.02;
     if (_purchasedOneTimeIds.contains('hash_booster_20')) m *= 1.06;
     if (_purchasedOneTimeIds.contains('power_pack_30')) m *= 1.08;
     if (_purchasedOneTimeIds.contains('pro_upgrade_50')) m *= 1.12;
@@ -603,8 +607,13 @@ class GameStateService extends ChangeNotifier {
       await _firebaseSync.recordOneTimePurchase(_userId!, productId);
       _purchasedOneTimeIds = await _firebaseSync.getOneTimePurchases(_userId!);
     } else {
-      if (_purchasedOneTimeIds.contains(productId)) return;
-      _purchasedOneTimeIds = [..._purchasedOneTimeIds, productId];
+      if (_purchasedOneTimeIds.contains(productId) &&
+          !ShopProducts.isRepeatableFarmRigProduct(productId)) {
+        return;
+      }
+      if (!_purchasedOneTimeIds.contains(productId)) {
+        _purchasedOneTimeIds = [..._purchasedOneTimeIds, productId];
+      }
     }
     if (btcAmount != null && btcAmount > 0) _data = _addMinedToCoin(_data, Coins.primaryId, btcAmount);
     List<String> newRigs = List.from(_data.ownedRigIds);

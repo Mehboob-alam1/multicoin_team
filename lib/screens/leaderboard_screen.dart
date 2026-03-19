@@ -186,7 +186,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
     return ListView(
       physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+      padding: EdgeInsets.fromLTRB(AppTheme.pagePaddingH, 4, AppTheme.pagePaddingH, AppTheme.pageBottomPadding(context)),
       children: [
         // ── Top 3 profile cards ──────────────────────────────────────────────
         _TopThreeProfileCards(

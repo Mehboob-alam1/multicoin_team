@@ -1,0 +1,246 @@
+HOW MINING WORKS IN BTC_SIM (CODE-ACCURATE OVERVIEW)
+=====================================================
+
+This document explains how the app computes mining, how rigs and purchases connect
+to that system, and how premium and other bonuses stack. It is based on the
+current Dart implementation (GameStateService, MiningEngine, HomeShell timer,
+IAP callbacks, farm tiers, energy).
+
+
+1. THE MAIN LOOP (WHEN "MINING HAPPENS")
+----------------------------------------
+
+While the app is open and the Home screen shell is running, a timer fires every
+1 second (see home_shell.dart). Each tick:
+
+  - External modifiers are applied (events, daily boost, energy efficiency,
+    progression location bonus, prestige, remote config overrides).
+  - GameStateService.updateTick() is called, which runs tick().
+  - EnergyCoolingService updates heat based on how many rigs you own and whether
+    mining is treated as active.
+
+tick() compares the current time to the previous tick time, converts the elapsed
+time to minutes, and for each coin ID in the player's "selected mining coins"
+list it adds:
+
+  earned = (effective coins per minute for that coin) * (elapsed minutes)
+
+Those amounts are added to the player's balances (and lifetime mined stats).
+So mining is continuous: the longer the interval between ticks, the more coins
+are credited in one step (proportional to time, not to frame rate).
+
+
+2. WHAT A "RIG" DOES
+--------------------
+
+Your farm is a list of rig type IDs stored in ownedRigIds (multiple entries
+allowed — you can own several of the same rig).
+
+For each owned rig, the game looks up MiningRigs.byId(id). Each rig has:
+
+  - A base BTC per minute (btcPerMin) for legacy rigs, and/or
+  - Per-coin rates (ratePerCoin) and supportedCoins for multi-coin rigs.
+
+For a given coin (e.g. btc, eth), the rig only contributes if it supports that
+coin and the base rate for that coin is positive.
+
+The total rate for one coin is the SUM over all your rigs of an "effective"
+per-rig rate (see section 3). That sum is then multiplied by a global bundle
+from one-time shop purchases (pack multipliers — see section 6) and by the
+daily boost multiplier from DailyBoostService.
+
+
+3. THE EFFECTIVE RATE FORMULA (MiningEngine)
+--------------------------------------------
+
+For each rig and each coin, the game uses MiningEngine.effectiveRateForCoin():
+
+  effectiveRate =
+      baseRateForCoin
+      * (1 / difficultyMultiplierForCoin)
+      * farmMultiplier
+      * sessionMultiplier
+      * premiumMultiplier
+      * boostMultiplier
+      * eventMultiplier
+      * efficiencyMultiplier
+      * prestigeSpeedMultiplier
+
+Where:
+
+  - baseRateForCoin comes from the rig definition (coins per minute, before
+    global pack bonuses).
+
+  - difficulty: each Coin in Coins has a difficulty value. The engine divides
+    by a clamped difficulty term so harder coins yield less from the same rig
+    stats.
+
+  - farmMultiplier: from your current FarmTier (see farm_tier.dart). Higher
+    farm level increases BOTH rig capacity AND this multiplier, so upgrading
+    the farm buffs every rig you own.
+
+  - sessionMultiplier: 1.25 while a mining session is active, otherwise 1.0.
+    Sessions are started in-game (startMiningSession) and last a fixed duration
+    (see GameStateService _sessionMinutes).
+
+  - premiumMultiplier: 1.5 while premium subscription is active, else 1.0.
+
+  - boostMultiplier: 2.0 while the short-term boost window is active (e.g. 2x
+    boost IAP), else 1.0.
+
+  - eventMultiplier: from live events and/or AdRemoteConfigService overrides.
+
+  - efficiencyMultiplier: from EnergyCoolingService — stays 1.0 if heat is low;
+    if the farm runs hot, it can drop (clamped down to 0.6 at worst), reducing
+    all mining until heat is managed (cooling/power/solar upgrades).
+
+  - prestigeSpeedMultiplier: from PrestigeService permanent progression.
+
+After summing rigs, GameStateService applies _oneTimeMiningMultiplier() — a
+product of permanent bonuses tied to which one-time IAP product IDs have been
+purchased (starter_pack, satoshi_pack, mega_pack, hash_booster_20, etc.). See
+section 6.
+
+So: rigs are the base "hash power." Farm tier, premium, session, boost, events,
+efficiency, prestige, daily boost, and pack multipliers all connect into the same
+math — the app is designed so spending and progression visibly change one number
+chain: output per minute.
+
+
+4. FARM TIER (BTC UPGRADE, NOT GOOGLE PLAY)
+-------------------------------------------
+
+Farm tiers (Garage, Warehouse, Industrial, Mega Facility) are upgraded with
+in-game BTC (upgradeFarm). Each tier defines:
+
+  - rigCapacity: how many rig slots you can fill.
+  - miningMultiplier: applied to every rig's contribution (e.g. 1.0, 1.1,
+    1.25, 1.5).
+
+If the farm is full, you cannot add more rigs until you upgrade tier or gain
+extra capacity from progression bonuses.
+
+
+5. RIGS FROM IAP (ONE-TIME PRODUCTS)
+------------------------------------
+
+Rig-related IAP products are defined in shop_product.dart with a rigId. When a
+purchase completes, IapService fires onPurchaseSuccess; HomeShell calls
+game.applyOneTimePurchase with optional btcAmount and rigId.
+
+applyOneTimePurchase:
+
+  - Records the product in purchased one-time IDs (Firebase or local list),
+    with special rules so "farm rig" SKUs can be bought more than once if
+    configured as repeatable farm products.
+  - Adds any granted BTC to the primary coin balance.
+  - Appends rigId to ownedRigIds if present — that new rig immediately starts
+    contributing to the sum in section 2.
+
+Starter packs / mega packs in the shop may include BOTH a BTC grant and a rig
+in one purchase (see product definitions). Pure "hash booster" style products
+grant no rig but add a permanent multiplier via _oneTimeMiningMultiplier once
+the product ID is in the purchased list.
+
+So: one-time products either put more "hardware" on your farm (rigs), inject
+BTC directly, flip permanent global multipliers, activate a time-limited 2x
+boost, or unlock season content — depending on the product ID.
+
+
+6. ONE-TIME MINING MULTIPLIERS (PACKS AND UPGRADES)
+---------------------------------------------------
+
+The method _oneTimeMiningMultiplier() in GameStateService multiplies the total
+rig sum (after per-rig engine math) based on which product IDs were purchased.
+Examples from code:
+
+  starter_pack: 1.05x
+  satoshi_pack: 1.03x
+  mega_pack:    1.15x
+  season_pass:  1.02x
+  hash_booster_20 through ultimate_pack_200: progressively larger multipliers
+  (up to 1.25x for ultimate_pack_200).
+
+These stack multiplicatively (each owned ID multiplies m). They do not add new
+rigs unless the same product also specifies rigId in the shop data.
+
+
+7. PREMIUM SUBSCRIPTION
+-----------------------
+
+Premium is a subscription (premium_monthly, premium_yearly). On successful IAP,
+activatePremium sets an expiry date. While DateTime.now() is before expiry,
+isPremiumActive is true and premiumMultiplier is 1.5 in MiningEngine.
+
+Premium is separate from farm tier and separate from one-time pack multipliers;
+it multiplies inside the engine line for each rig.
+
+
+8. MINING SESSION AND 2X BOOST
+------------------------------
+
+Mining session: when active, sessionMultiplier is 1.25 for rate calculation.
+
+2x boost (boost_2x_1h product): on purchase, activateBoost1h sets a boost expiry;
+while active, boostMultiplier is 2.0 in the engine.
+
+Both are time windows stored in player state / Firebase as applicable.
+
+
+9. WHEN THE APP IS CLOSED (BACKGROUND / IDLE)
+---------------------------------------------
+
+When going to background, GameStateService persists snapshot data including
+rates with and without session, and last closed time. A background task
+(background_mining_task.dart) can apply idle earnings using stored rates, capped
+by a maximum idle duration, and merge balances in SharedPreferences. This keeps
+progression feeling connected even when the UI is not running, within limits.
+
+
+10. HOW EVERYTHING FEELS "ABOUT MINING"
+---------------------------------------
+
+  - Rigs: raw output per minute per coin (scaled by difficulty and all
+    multipliers).
+  - Farm tier: global multiplier + room for more rigs.
+  - Premium / session / boost / events: temporary or subscription-wide knobs on
+    the same rate.
+  - Packs and hash bundles: permanent global multipliers on total output plus
+    sometimes BTC drops or rigs.
+  - Energy: too much heat reduces efficiencyMultiplier for all mining until
+    improved.
+  - Prestige and progression: further multiply or unlock capacity.
+
+There is a single coherent pipeline: owned rigs define base rates; farm tier,
+premium, boosts, events, efficiency, prestige, daily boost, and one-time
+purchase flags define multipliers; time integration turns "coins per minute"
+into balance changes each tick.
+
+
+11. NOTE ON MULTI-COIN VS UI
+----------------------------
+
+The engine supports multiple coins and per-coin rig rates. Some UI paths may
+focus display on BTC; setSelectedMiningCoins in GameStateService may normalize
+selection for the primary coin in current builds. The mining tick still iterates
+selectedMiningCoinIds — check PlayerData and dashboard for which coins are active
+in your branch.
+
+
+12. ECONOMY SCALE (FREE PROGRESSION TARGET)
+-------------------------------------------
+
+All rig base rates are multiplied by MiningEconomy.outputScale in
+GameStateService before difficulty and other multipliers (see lib/config/
+mining_economy.dart). This keeps relative power between rig types the same but
+slows absolute earning.
+
+Baseline assumption for tuning: new players start with one free "laptop" rig
+(PlayerData default ownedRigIds), farm tier 1, no IAP pack multipliers, no
+premium, no active session boost, efficiency 1.0. MiningEconomy.outputScale
+(see lib/config/mining_economy.dart) is set conservatively so free baseline
+income is NOT too fast — at ~USD 100k per BTC reference, on the order of
+~2–3 months to ~USD 100 from that lone-laptop baseline alone. Live USD varies
+with CoinGecko BTC and with sessions, rigs, farm tier, premium, packs, heat.
+
+END OF DOCUMENT

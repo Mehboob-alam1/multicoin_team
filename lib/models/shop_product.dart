@@ -84,6 +84,88 @@ class ShopProducts {
       price: '\$2.99',
       icon: '🏆',
     ),
+    // ─── Farm rigs (IAP USD only on Farm screen — no BTC) ───────────────────
+    OneTimeProduct(
+      id: 'laptop_rig',
+      name: 'Laptop miner',
+      description: '1× Laptop miner rig for your farm',
+      price: '\$0.99',
+      rigId: 'laptop',
+      icon: '💻',
+    ),
+    OneTimeProduct(
+      id: 'rig_gpu',
+      name: 'GPU rig',
+      description: '1× GPU rig for your farm',
+      price: '\$2.99',
+      rigId: 'gpu_rig',
+      icon: '🖥',
+    ),
+    OneTimeProduct(
+      id: 'rig_rack',
+      name: 'Mining rack',
+      description: '1× Mining rack for your farm',
+      price: '\$9.99',
+      rigId: 'mining_rack',
+      icon: '📦',
+    ),
+    OneTimeProduct(
+      id: 'warehouse_farm_rig',
+      name: 'Warehouse farm',
+      description: '1× Warehouse farm rig',
+      price: '\$19.99',
+      rigId: 'warehouse_farm',
+      icon: '🏭',
+    ),
+    OneTimeProduct(
+      id: 'mega_facility_rig',
+      name: 'Mega mining facility',
+      description: '1× Mega mining facility rig',
+      price: '\$49.99',
+      rigId: 'mega_facility',
+      icon: '🌟',
+    ),
+    // ─── Multi-coin farm rigs (same USD/IAP flow as legacy rigs) ────────────
+    OneTimeProduct(
+      id: 'cpu_miner_rig',
+      name: 'CPU Miner',
+      description: '1× CPU miner (multi-coin)',
+      price: '\$0.99',
+      rigId: 'cpu_miner',
+      icon: '🧮',
+    ),
+    OneTimeProduct(
+      id: 'gaming_gpu_rig_iap',
+      name: 'Gaming GPU Rig',
+      description: '1× Gaming GPU rig (multi-coin)',
+      price: '\$2.99',
+      rigId: 'gaming_gpu_rig',
+      icon: '🎮',
+    ),
+    OneTimeProduct(
+      id: 'gpu_cluster_rig',
+      name: 'GPU Mining Cluster',
+      description: '1× GPU mining cluster (multi-coin)',
+      price: '\$9.99',
+      rigId: 'gpu_cluster',
+      icon: '📊',
+    ),
+    OneTimeProduct(
+      id: 'asic_btc_rig',
+      name: 'ASIC Bitcoin Miner',
+      description: '1× ASIC Bitcoin miner',
+      price: '\$19.99',
+      rigId: 'asic_btc',
+      icon: '⚡',
+    ),
+    OneTimeProduct(
+      id: 'data_center_rig_iap',
+      name: 'Advanced Data Center Rig',
+      description: '1× Advanced data center rig (multi-coin)',
+      price: '\$49.99',
+      rigId: 'data_center_rig',
+      icon: '🏢',
+    ),
     // ─── Premium one-time mining items (all under $200) ─────────────────────
     OneTimeProduct(
       id: 'hash_booster_20',
@@ -161,6 +243,42 @@ class ShopProducts {
     } catch (_) {
       return null;
     }
+  }
+
+  /// IAP product IDs for rigs sold on the Mining Farm (repeatable purchases / consumable in Play).
+  static const farmRigIapProductIds = <String>{
+    'laptop_rig',
+    'rig_gpu',
+    'rig_rack',
+    'warehouse_farm_rig',
+    'mega_facility_rig',
+    'cpu_miner_rig',
+    'gaming_gpu_rig_iap',
+    'gpu_cluster_rig',
+    'asic_btc_rig',
+    'data_center_rig_iap',
+  };
+
+  /// True for farm rig SKUs that can be bought more than once (each purchase adds a rig).
+  static bool isRepeatableFarmRigProduct(String productId) =>
+      farmRigIapProductIds.contains(productId);
+
+  /// One-time IAP product for this rig on the Farm screen (USD only, not starter_pack).
+  static OneTimeProduct? farmIapProductForRig(String rigId) {
+    final id = switch (rigId) {
+      'laptop' => 'laptop_rig',
+      'gpu_rig' => 'rig_gpu',
+      'mining_rack' => 'rig_rack',
+      'warehouse_farm' => 'warehouse_farm_rig',
+      'mega_facility' => 'mega_facility_rig',
+      'cpu_miner' => 'cpu_miner_rig',
+      'gaming_gpu_rig' => 'gaming_gpu_rig_iap',
+      'gpu_cluster' => 'gpu_cluster_rig',
+      'asic_btc' => 'asic_btc_rig',
+      'data_center_rig' => 'data_center_rig_iap',
+      _ => null,
+    };
+    return id != null ? oneTimeById(id) : null;
   }
 
   static PremiumPlan? planById(String id) {

@@ -105,7 +105,7 @@ class ProfileScreen extends StatelessWidget {
                   ),
 
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+                    padding: EdgeInsets.fromLTRB(AppTheme.pagePaddingH, 8, AppTheme.pagePaddingH, AppTheme.pageBottomPadding(context)),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
 
@@ -642,9 +642,15 @@ class _WithdrawalCard extends StatelessWidget {
               value: game.btcBalance.toStringAsFixed(4),
             ),
           ] else ...[
-            Text(
-              'Minimum withdrawal: \$${WithdrawalService.minWithdrawalUsd.toStringAsFixed(0)} worth of BTC.',
-              style: const TextStyle(color: _D.textMid, fontSize: 12),
+            Row(
+              children: [
+                const Icon(Icons.attach_money, color: _D.textMid, size: 14),
+                const SizedBox(width: 4),
+                Text(
+                  'Minimum withdrawal: \$${WithdrawalService.minWithdrawalUsd.toStringAsFixed(0)} USD worth of BTC.',
+                  style: const TextStyle(color: _D.textMid, fontSize: 12),
+                ),
+              ],
             ),
             if (btcPrice.priceUsd != null)
               Text(
@@ -668,9 +674,15 @@ class _WithdrawalCard extends StatelessWidget {
                 ),
               )
             else
-              Text(
-                'Keep mining to reach \$${WithdrawalService.minWithdrawalUsd} in BTC.',
-                style: const TextStyle(color: _D.textMid, fontSize: 12),
+              Row(
+                children: [
+                  const Icon(Icons.attach_money, color: _D.textMid, size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Keep mining to reach \$${WithdrawalService.minWithdrawalUsd} USD in BTC.',
+                    style: const TextStyle(color: _D.textMid, fontSize: 12),
+                  ),
+                ],
               ),
           ],
         ],

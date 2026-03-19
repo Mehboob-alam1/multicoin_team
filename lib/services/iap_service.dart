@@ -7,6 +7,8 @@ import '../models/shop_product.dart';
 class IapService extends ChangeNotifier {
   static const oneTimeIds = {
     'starter_pack', 'satoshi_pack', 'mega_pack', 'boost_2x_1h', 'season_pass',
+    'laptop_rig', 'rig_gpu', 'rig_rack', 'warehouse_farm_rig', 'mega_facility_rig',
+    'cpu_miner_rig', 'gaming_gpu_rig_iap', 'gpu_cluster_rig', 'asic_btc_rig', 'data_center_rig_iap',
     'hash_booster_20', 'power_pack_30', 'pro_upgrade_50',
     'elite_bundle_100', 'tycoon_kit_150', 'ultimate_pack_200',
   };
@@ -89,11 +91,17 @@ class IapService extends ChangeNotifier {
   }
 
   /// Start purchase flow for one-time product (starter_pack, satoshi_pack, mega_pack, boost_2x_1h).
+  /// Farm rig SKUs use [buyConsumable] so the same product can be purchased multiple times
+  /// (configure those products as **consumable** in Play Console / consumable in App Store).
   Future<bool> buyProduct(String productId) async {
     final product = getProduct(productId);
     if (product == null) return false;
     try {
-      return await _iap.buyNonConsumable(purchaseParam: PurchaseParam(productDetails: product));
+      final param = PurchaseParam(productDetails: product);
+      if (ShopProducts.isRepeatableFarmRigProduct(productId)) {
+        return await _iap.buyConsumable(purchaseParam: param, autoConsume: true);
+      }
+      return await _iap.buyNonConsumable(purchaseParam: param);
     } catch (e) {
       _error = e.toString();
       notifyListeners();
