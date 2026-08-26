@@ -51,6 +51,17 @@ _RigMeta _metaForRig(String id) => switch (id) {
   _                 => const _RigMeta(Icons.hardware_rounded,      _D.textMid,        ''),
 };
 
+/// Scales farm card type so long rig names stay fully visible on narrow screens.
+double _rigNameSize(BuildContext context) {
+  final w = MediaQuery.sizeOf(context).width;
+  return (w * 0.031).clamp(11.0, 13.0);
+}
+
+double _rigMetaSize(BuildContext context) {
+  final w = MediaQuery.sizeOf(context).width;
+  return (w * 0.023).clamp(8.0, 10.0);
+}
+
 String _formatMiningRateLine(String coinId, double rate) {
   final sym = coinId.toUpperCase();
   if (rate == 0) return '$sym —';
@@ -756,8 +767,8 @@ class _RigCard extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      width: 46,
-                      height: 46,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: meta.accent.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(12),
@@ -766,56 +777,50 @@ class _RigCard extends StatelessWidget {
                           width: 1,
                         ),
                       ),
-                      child: Icon(meta.icon, color: meta.accent, size: 22),
+                      child: Icon(meta.icon, color: meta.accent, size: 20),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          rig.name,
-                          style: const TextStyle(
-                            color: _D.textHi,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      rig.name,
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: _D.textHi,
+                        fontWeight: FontWeight.w700,
+                        fontSize: _rigNameSize(context),
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                  if (meta.tier.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: meta.accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(
+                        meta.tier,
+                        style: TextStyle(
+                          color: meta.accent,
+                          fontSize: _rigMetaSize(context),
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
                         ),
                       ),
-                      if (meta.tier.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: meta.accent.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                            child: Text(
-                              meta.tier,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: meta.accent,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.bolt_rounded, color: meta.accent, size: 12),
+                      Icon(Icons.bolt_rounded, color: meta.accent, size: 11),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
@@ -823,7 +828,7 @@ class _RigCard extends StatelessWidget {
                           style: TextStyle(
                             color: meta.accent,
                             fontFamily: AppTheme.fontFamily,
-                            fontSize: 11,
+                            fontSize: _rigMetaSize(context) + 1,
                             fontWeight: FontWeight.w600,
                           ),
                           maxLines: 1,
@@ -837,11 +842,11 @@ class _RigCard extends StatelessWidget {
                           color: _D.green.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text(
+                        child: Text(
                           'USD',
                           style: TextStyle(
                             color: _D.green,
-                            fontSize: 9,
+                            fontSize: _rigMetaSize(context),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -927,13 +932,14 @@ class _RigCard extends StatelessWidget {
                                     : const Icon(Icons.shopping_cart_outlined, size: 16),
                                 label: Text(
                                   priceStrUsd!.startsWith('\$') ? priceStrUsd! : '\$$priceStrUsd',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                  style: TextStyle(fontSize: _rigNameSize(context), fontWeight: FontWeight.w700),
                                 ),
                                 style: FilledButton.styleFrom(
                                   backgroundColor: _D.green,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
                                   minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
                               )
@@ -942,13 +948,14 @@ class _RigCard extends StatelessWidget {
                                 icon: const Icon(Icons.shopping_cart_outlined, size: 16),
                                 label: Text(
                                   priceStrUsd!.startsWith('\$') ? priceStrUsd! : '\$$priceStrUsd',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                  style: TextStyle(fontSize: _rigNameSize(context), fontWeight: FontWeight.w700),
                                 ),
                                 style: FilledButton.styleFrom(
                                   backgroundColor: _D.green.withValues(alpha: 0.45),
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
                                   minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
                               ),
