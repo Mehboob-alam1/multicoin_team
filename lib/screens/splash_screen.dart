@@ -1,15 +1,47 @@
-import 'dart:math' as math;
-import 'dart:ui';
+import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 
 import '../models/shop_product.dart';
+import '../services/ad_pacing_service.dart';
+import '../services/ad_remote_config_service.dart';
 import '../services/analytics_service.dart';
 import '../services/auth_service.dart';
+import '../services/background_mining_task.dart';
 import '../services/game_state_service.dart';
 import '../services/iap_service.dart';
-import '../theme/app_theme.dart';
+import '../services/smart_ad_manager.dart';
+import '../utils/smart_ads.dart';
+import '../widgets/app_brand_logo.dart';
+
+class _D {
+  static const bg = Color(0xFF08080A);
+  static const gold = Color(0xFF9945FF);
+  static const goldText = Color(0xFFE9D5FF);
+  static const goldBdr = Color(0x669945FF);
+  static const green = Color(0xFF14F195);
+  static const textHi = Color(0xFFF4F4F5);
+  static const textMid = Color(0xFFA1A1AA);
+}
+
+TextStyle _sg({
+  double size = 14,
+  FontWeight weight = FontWeight.w500,
+  Color color = _D.textHi,
+  double? spacing,
+}) =>
+    GoogleFonts.spaceGrotesk(
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+      letterSpacing: spacing,
+      height: 1.1,
+    );
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,21 +50,29 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
   late final AnimationController _pulse = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1400),
+    duration: const Duration(milliseconds: 1700),
   )..repeat(reverse: true);
 
-  late final AnimationController _spin = AnimationController(
+  late final AnimationController _intro = AnimationController(
     vsync: this,
-    duration: const Duration(seconds: 10),
-  )..repeat();
+    duration: const Duration(milliseconds: 640),
+  );
+
+  late final Animation<double> _introCurve = CurvedAnimation(
+    parent: _intro,
+    curve: Curves.easeOutCubic,
+  );
+
+  late final Animation<double> _introScale = Tween<double>(begin: 0.92, end: 1)
+      .animate(_introCurve);
 
   @override
   void initState() {
     super.initState();
+    _intro.forward();
     _boot();
   }
 
@@ -41,12 +81,12 @@ class _SplashScreenState extends State<SplashScreen>
     final auth = context.read<AuthService>();
     final game = context.read<GameStateService>();
     final iap = context.read<IapService>();
-
     final analytics = context.read<AnalyticsService>();
+
     iap.onPurchaseSuccess = (delivery) {
-      final p = ShopProducts.oneTimeById(delivery.productId);
+      final product = ShopProducts.oneTimeById(delivery.productId);
       final plan = ShopProducts.planById(delivery.productId);
-      final amountStr = p?.price ?? plan?.price ?? '';
+      final amountStr = product?.price ?? plan?.price ?? '';
       final amount = amountStr.startsWith('\$')
           ? (double.tryParse(amountStr.replaceFirst('\$', '').trim()) ?? 0)
           : 0.0;
@@ -60,6 +100,26 @@ class _SplashScreenState extends State<SplashScreen>
     };
     iap.init();
 
+    try {
+      await Hive.initFlutter();
+    } catch (_) {}
+    unawaited(startBackgroundMining());
+
+    try {
+      await MobileAds.instance.initialize();
+    } catch (e) {
+      debugPrint('MobileAds init: $e');
+    }
+
+    final adCfg = context.read<AdRemoteConfigService>();
+    final ads = context.read<SmartAdManager>();
+    final pacing = context.read<AdPacingService>();
+
+    try {
+      await adCfg.load().timeout(const Duration(seconds: 3));
+    } catch (_) {}
+    unawaited(pacing.load());
+
     final user = auth.currentUser;
     if (user != null) {
       game.setUserId(user.uid);
@@ -69,11 +129,21 @@ class _SplashScreenState extends State<SplashScreen>
       } catch (_) {}
     }
 
-    final elapsed = DateTime.now().difference(started);
-    const minShow = Duration(milliseconds: 1700);
-    if (elapsed < minShow) {
-      await Future.delayed(minShow - elapsed);
+    if (defaultTargetPlatform == TargetPlatform.android &&
+        !game.isPremiumActive &&
+        adCfg.shouldShowSdkAds) {
+      unawaited(ads.preloadAll());
+      if (adCfg.appOpenEnabled) {
+        try {
+          await ads.preloadAppOpen().timeout(const Duration(seconds: 3));
+        } catch (_) {}
+        if (mounted) await SmartAds.maybeAppOpen(context);
+      }
     }
+
+    final elapsed = DateTime.now().difference(started);
+    const minimum = Duration(milliseconds: 1200);
+    if (elapsed < minimum) await Future.delayed(minimum - elapsed);
     if (!mounted) return;
 
     if (user == null) {
@@ -88,97 +158,61 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void dispose() {
     _pulse.dispose();
-    _spin.dispose();
+    _intro.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
+      backgroundColor: _D.bg,
       body: Stack(
+        alignment: Alignment.center,
         children: [
-          Positioned(
-            top: -90,
-            right: -70,
-            child: _Glow(color: const Color(0xFFF59E0B).withValues(alpha: 0.12), size: 340),
-          ),
-          Positioned(
-            bottom: -60,
-            left: -80,
-            child: _Glow(color: const Color(0xFFA855F7).withValues(alpha: 0.10), size: 300),
-          ),
-          Center(
-            child: AnimatedBuilder(
-              animation: Listenable.merge([_pulse, _spin]),
-              builder: (_, __) {
-                final scale = 0.92 + (_pulse.value * 0.08);
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Transform.rotate(
-                      angle: _spin.value * math.pi * 2 * 0.04,
-                      child: Transform.scale(
-                        scale: scale,
-                        child: Container(
-                          width: 108,
-                          height: 108,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: const LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [Color(0xFFFBBF24), Color(0xFFF59E0B), Color(0xFFD97706)],
+          const Positioned.fill(child: CustomPaint(painter: _MeshPainter())),
+          Positioned.fill(
+            child: SafeArea(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: FadeTransition(
+                      opacity: _introCurve,
+                      child: ScaleTransition(
+                        scale: _introScale,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            AnimatedBuilder(
+                              animation: _pulse,
+                              builder: (_, __) => _LogoSlot(pulse: _pulse.value),
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFF59E0B).withValues(alpha: 0.45),
-                                blurRadius: 28,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.currency_bitcoin_rounded,
-                            color: Colors.white,
-                            size: 56,
-                          ),
+                            const SizedBox(height: 34),
+                            Text(
+                              'SOLANA',
+                              textAlign: TextAlign.center,
+                              style: _sg(size: 12, weight: FontWeight.w700, color: _D.goldText, spacing: 5.4),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Mining Tycoon',
+                              textAlign: TextAlign.center,
+                              style: _sg(size: 30, weight: FontWeight.w700, spacing: -0.9),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Warming up your validators',
+                              textAlign: TextAlign.center,
+                              style: _sg(size: 14, color: _D.textMid),
+                            ),
+                            const SizedBox(height: 36),
+                            const _LoadingBar(),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 28),
-                    const Text(
-                      'CRYPTO MINING TYCOON',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: AppTheme.fontFamily,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        letterSpacing: 2.4,
-                        color: Color(0xFF0D0F12),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Warming up your farm…',
-                      style: TextStyle(
-                        fontFamily: AppTheme.fontFamily,
-                        color: const Color(0xFF6B7280).withValues(alpha: 0.95),
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
-                        color: const Color(0xFFF59E0B).withValues(alpha: 0.85),
-                      ),
-                    ),
-                  ],
-                );
-              },
+                  ),
+                ),
             ),
           ),
         ],
@@ -187,20 +221,66 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-class _Glow extends StatelessWidget {
-  final Color color;
-  final double size;
-  const _Glow({required this.color, required this.size});
+class _LogoSlot extends StatelessWidget {
+  final double pulse;
+
+  const _LogoSlot({required this.pulse});
 
   @override
   Widget build(BuildContext context) {
-    return ImageFiltered(
-      imageFilter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
+    return Transform.scale(
+      scale: 1.0 + pulse * 0.03,
+      child: const AppBrandLogo(size: 168, circular: true),
+    );
+  }
+}
+
+class _LoadingBar extends StatelessWidget {
+  const _LoadingBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
       child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+        width: 132,
+        height: 4,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: const ClipRRect(
+          borderRadius: BorderRadius.all(Radius.circular(99)),
+          child: LinearProgressIndicator(
+            minHeight: 4,
+            backgroundColor: Colors.transparent,
+            color: _D.green,
+          ),
+        ),
       ),
     );
   }
+}
+
+class _MeshPainter extends CustomPainter {
+  const _MeshPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    void glow(Offset center, double radius, Color color) {
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [color, color.withValues(alpha: 0)],
+          ).createShader(Rect.fromCircle(center: center, radius: radius)),
+      );
+    }
+
+    glow(Offset(size.width * 0.5, size.height * 0.42), 230, const Color(0x389945FF));
+    glow(Offset(size.width * 0.22, size.height * 0.78), 170, const Color(0x2414F195));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

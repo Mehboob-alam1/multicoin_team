@@ -1,8 +1,31 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
 
 import '../models/player_data.dart';
+
+const backgroundMiningTaskName = 'btc_background_mining';
+
+@pragma('vm:entry-point')
+void workmanagerDispatcher() {
+  Workmanager().executeTask((taskName, inputData) async {
+    if (taskName == backgroundMiningTaskName) {
+      await backgroundMiningCallback();
+    }
+    return true;
+  });
+}
+
+Future<void> startBackgroundMining() async {
+  await Workmanager().initialize(workmanagerDispatcher);
+  await Workmanager().registerPeriodicTask(
+    backgroundMiningTaskName,
+    backgroundMiningTaskName,
+    frequency: const Duration(minutes: 15),
+    initialDelay: const Duration(minutes: 1),
+  );
+}
 
 /// Keys must match GameStateService storage.
 const String _playerDataKeyPrefix = 'btc_sim_player_data';
@@ -94,7 +117,7 @@ Future<void> backgroundMiningCallback() async {
     return;
   }
 
-  const primaryId = 'btc';
+  const primaryId = 'sol';
   final curBtc = data.coinBalances[primaryId] ?? data.btcBalance;
   final curLifeBtc = data.lifetimeMinedByCoin[primaryId] ?? data.lifetimeMinedBtc;
   final newCoins = Map<String, double>.from(data.coinBalances)..[primaryId] = curBtc + earned;

@@ -1,30 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'solana.dart';
+
 class AppTheme {
-  static const Color primary = Color(0xFFF59E0B);
-  static const Color primaryDark = Color(0xFFD97706);
-  static const Color surface = Color(0xFFF7F8FA);
-  static const Color surfaceVariant = Color(0xFFF2F4F8);
-  static const Color cardBg = Color(0xFFFFFFFF);
-  static const Color btcGold = Color(0xFFF59E0B);
+  static const Color primary = Solana.purple;
+  static const Color primaryDark = Color(0xFF7A2FE0);
+  static const Color accent = Solana.green;
+  static const Color surface = Solana.bg;
+  static const Color surfaceVariant = Solana.surface;
+  static const Color cardBg = Solana.surfaceRaised;
+  static const Color btcGold = Solana.purple;
 
-  static const String fontFamily = 'Space Grotesk';
+  static const String fontFamily = 'Plus Jakarta Sans';
 
-  static const Color textPrimary = Color(0xFF0D0F12);
-  static const Color textSecondary = Color(0xFF6B7280);
-  static const Color border = Color(0xFFE2E8F0);
+  static const Color textPrimary = Solana.textHi;
+  static const Color textSecondary = Solana.textMid;
+  static const Color border = Solana.border;
 
-  /// Layout: use for consistent, flexible spacing across the app.
   static const double pagePaddingH = 20;
   static const double pagePaddingV = 16;
   static const double sectionSpacing = 20;
   static const double cardSpacing = 12;
-  static const double cardRadius = 16;
+  static const double cardRadius = 22;
   static const double bottomNavHeight = 76;
-  /// Bottom padding for scroll content when floating nav is visible (nav + safe area handled in shell).
+  static const double bannerAdHeight = 50;
+  static const ScrollPhysics pageScroll = AlwaysScrollableScrollPhysics();
+
   static double pageBottomPadding(BuildContext context) =>
-      bottomNavHeight + MediaQuery.of(context).padding.bottom + 8;
+      bottomNavHeight +
+      bannerAdHeight +
+      MediaQuery.of(context).padding.bottom +
+      8;
   static EdgeInsets pagePadding(BuildContext context) => EdgeInsets.fromLTRB(
     pagePaddingH,
     pagePaddingV,
@@ -35,26 +43,33 @@ class AppTheme {
       EdgeInsets.fromLTRB(pagePaddingH, pagePaddingV, pagePaddingH, pagePaddingV);
 
   static TextTheme get lightTextTheme =>
-      GoogleFonts.spaceGroteskTextTheme(ThemeData.light().textTheme);
-  /// Alias for light theme (app uses whitish theme everywhere).
+      GoogleFonts.plusJakartaSansTextTheme(ThemeData.dark().textTheme);
   static TextTheme get darkTextTheme => lightTextTheme;
 
   static ThemeData get light {
+    final textTheme = GoogleFonts.plusJakartaSansTextTheme(
+      ThemeData.dark().textTheme.copyWith(
+        bodyLarge: const TextStyle(color: textPrimary),
+        bodyMedium: const TextStyle(color: textPrimary),
+        titleLarge: const TextStyle(color: textPrimary),
+        titleMedium: const TextStyle(color: textPrimary),
+      ),
+    );
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.light,
-      fontFamily: GoogleFonts.spaceGrotesk().fontFamily,
-      textTheme: GoogleFonts.spaceGroteskTextTheme(
-        ThemeData.light().textTheme.copyWith(
-          bodyLarge: TextStyle(color: textPrimary),
-          bodyMedium: TextStyle(color: textPrimary),
-          titleLarge: TextStyle(color: textPrimary),
-          titleMedium: TextStyle(color: textPrimary),
-        ),
+      brightness: Brightness.dark,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+        },
       ),
-      colorScheme: ColorScheme.light(
+      fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
+      textTheme: textTheme,
+      colorScheme: const ColorScheme.dark(
         primary: primary,
         onPrimary: Colors.white,
+        secondary: accent,
+        onSecondary: Color(0xFF052E1C),
         surface: surface,
         onSurface: textPrimary,
         surfaceContainerHighest: surfaceVariant,
@@ -65,19 +80,20 @@ class AppTheme {
         foregroundColor: textPrimary,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        titleTextStyle: GoogleFonts.spaceGrotesk(
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+        titleTextStyle: GoogleFonts.plusJakartaSans(
           color: textPrimary,
           fontSize: 20,
           fontWeight: FontWeight.w600,
         ),
-        iconTheme: IconThemeData(color: textPrimary),
+        iconTheme: const IconThemeData(color: textPrimary),
       ),
       cardTheme: CardThemeData(
         color: cardBg,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(cardRadius)),
         margin: EdgeInsets.zero,
-        shadowColor: Colors.black.withValues(alpha: 0.06),
+        shadowColor: Solana.purple.withValues(alpha: 0.12),
         clipBehavior: Clip.antiAlias,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -85,19 +101,26 @@ class AppTheme {
           backgroundColor: primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: cardBg,
         selectedItemColor: primary,
         unselectedItemColor: textSecondary,
         type: BottomNavigationBarType.fixed,
       ),
       dividerColor: border,
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: cardBg,
+        contentTextStyle: const TextStyle(color: textPrimary),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: border),
+        ),
+      ),
     );
   }
 
-  /// Legacy dark theme (kept for reference).
   static ThemeData get dark => light;
 }

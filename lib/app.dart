@@ -39,6 +39,7 @@ import 'screens/news_screen.dart';
 import 'screens/mini_game_screen.dart';
 import 'screens/mining_farm_screen.dart';
 import 'screens/shop_screen.dart';
+import 'utils/smart_ads.dart';
 
 class BtcSimApp extends StatelessWidget {
   const BtcSimApp({super.key});
@@ -76,24 +77,71 @@ class BtcSimApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => SeasonService()),
         ChangeNotifierProvider(create: (ctx) => GameStateService(ctx.read<FirebaseSyncService>())),
       ],
-      child: MaterialApp(
-        title: 'Crypto Mining Tycoon',
-        theme: AppTheme.light,
-        debugShowCheckedModeBanner: false,
-        initialRoute: '/',
-        routes: {
-          '/': (ctx) => const SplashScreen(),
-          '/login': (ctx) => const LoginScreen(),
-          '/premium-offer': (ctx) => const PremiumOfferScreen(),
-          '/home': (ctx) => const HomeShell(),
-          '/profile': (ctx) => const ProfileScreen(),
-          '/lucky-spin': (ctx) => const LuckySpinScreen(),
-          '/news': (ctx) => const NewsScreen(),
-          '/mini-game': (ctx) => const MiniGameScreen(),
-          '/farm': (ctx) => const MiningFarmScreen(),
-          '/shop': (ctx) => const ShopScreen(),
-        },
-      ),
+      child: const _AppRoot(),
+    );
+  }
+}
+
+class _AppRoot extends StatefulWidget {
+  const _AppRoot();
+
+  @override
+  State<_AppRoot> createState() => _AppRootState();
+}
+
+class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
+  final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
+  late final AdRouteObserver _adRoutes = AdRouteObserver(_navKey);
+  bool _wasBackground = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _wasBackground = true;
+      return;
+    }
+    if (state != AppLifecycleState.resumed || !_wasBackground) return;
+    _wasBackground = false;
+    final ctx = _navKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    Future<void>.delayed(const Duration(milliseconds: 400), () {
+      if (ctx.mounted) SmartAds.maybeAppOpen(ctx);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Solana Mining Tycoon',
+      theme: AppTheme.light,
+      debugShowCheckedModeBanner: false,
+      navigatorKey: _navKey,
+      navigatorObservers: [_adRoutes],
+      initialRoute: '/',
+      routes: {
+        '/': (ctx) => const SplashScreen(),
+        '/login': (ctx) => const LoginScreen(),
+        '/premium-offer': (ctx) => const PremiumOfferScreen(),
+        '/home': (ctx) => const HomeShell(),
+        '/profile': (ctx) => const ProfileScreen(),
+        '/lucky-spin': (ctx) => const LuckySpinScreen(),
+        '/news': (ctx) => const NewsScreen(),
+        '/mini-game': (ctx) => const MiniGameScreen(),
+        '/farm': (ctx) => const MiningFarmScreen(),
+        '/shop': (ctx) => const ShopScreen(),
+      },
     );
   }
 }

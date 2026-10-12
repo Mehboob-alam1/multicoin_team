@@ -1,3 +1,5 @@
+import '../config/mining_economy.dart';
+
 class PlayerData {
   static const Object _unset = Object();
 
@@ -16,11 +18,11 @@ class PlayerData {
   final int totalSessionsStarted;
   final List<String> claimedMilestones;
   final DateTime? lastClosedAt;
-  /// Coin IDs the user chose to mine. Only these receive mining output. App is BTC-only.
+  /// Coin IDs the user chose to mine. Only these receive mining output. App is SOL-only.
   final List<String> selectedMiningCoinIds;
 
-  /// Only BTC is mined.
-  static const List<String> defaultMiningCoinIds = ['btc'];
+  /// Only SOL is mined.
+  static const List<String> defaultMiningCoinIds = ['sol'];
 
   const PlayerData({
     this.btcBalance = 0,
@@ -101,6 +103,10 @@ class PlayerData {
       }
     }
     if (coins.isEmpty && btcBal > 0) coins['btc'] = btcBal;
+    if ((coins['sol'] ?? 0) <= 0) {
+      final legacy = coins['btc'] ?? btcBal;
+      if (legacy > 0) coins['sol'] = MiningEconomy.toSol(legacy);
+    }
     Map<String, double> lifeByCoin = {};
     if (json['lifetimeMinedByCoin'] is Map) {
       for (final e in (json['lifetimeMinedByCoin'] as Map).entries) {
@@ -108,6 +114,10 @@ class PlayerData {
       }
     }
     if (lifeByCoin.isEmpty && lifeBtc > 0) lifeByCoin['btc'] = lifeBtc;
+    if ((lifeByCoin['sol'] ?? 0) <= 0) {
+      final legacyLife = lifeByCoin['btc'] ?? lifeBtc;
+      if (legacyLife > 0) lifeByCoin['sol'] = MiningEconomy.toSol(legacyLife);
+    }
     List<String> selectedCoins = List.from(PlayerData.defaultMiningCoinIds);
     return PlayerData(
       btcBalance: btcBal,

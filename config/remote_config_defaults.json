@@ -1,111 +1,103 @@
 {
   "parameters": {
     "ads_enabled": {
-      "defaultValue": {
-        "value": "true"
-      },
+      "defaultValue": { "value": "true" },
+      "description": "Master switch. false turns off every ad.",
+      "valueType": "BOOLEAN"
+    },
+    "ads_interstitial_enabled": {
+      "defaultValue": { "value": "true" },
+      "description": "Show interstitial ads on screen changes.",
+      "valueType": "BOOLEAN"
+    },
+    "ads_app_open_enabled": {
+      "defaultValue": { "value": "true" },
+      "description": "Show app-open ads on launch and resume.",
+      "valueType": "BOOLEAN"
+    },
+    "ads_native_enabled": {
+      "defaultValue": { "value": "true" },
+      "description": "Show native ads in screen slots.",
+      "valueType": "BOOLEAN"
+    },
+    "ads_banner_enabled": {
+      "defaultValue": { "value": "true" },
+      "description": "Show banner / MREC ads in screen slots.",
+      "valueType": "BOOLEAN"
+    },
+    "ads_rewarded_enabled": {
+      "defaultValue": { "value": "true" },
+      "description": "Allow rewarded ads (withdrawal, daily, etc).",
       "valueType": "BOOLEAN"
     },
     "use_custom_tab": {
-      "defaultValue": {
-        "value": "false"
-      },
+      "defaultValue": { "value": "false" },
+      "description": "Open custom_tab_url instead of SDK ads.",
       "valueType": "BOOLEAN"
     },
     "custom_tab_url": {
-      "defaultValue": {
-        "value": "https://example.com"
-      },
+      "defaultValue": { "value": "https://example.com" },
+      "description": "URL used when use_custom_tab is true.",
       "valueType": "STRING"
     },
     "interstitial_ad_unit": {
-      "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/1033173712"
-      },
+      "defaultValue": { "value": "ca-app-pub-3940256099942544/1033173712" },
       "valueType": "STRING"
     },
     "interstitial_admanager_unit": {
-      "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/1033173712"
-      },
+      "defaultValue": { "value": "ca-app-pub-3940256099942544/1033173712" },
       "valueType": "STRING"
     },
     "rewarded_ad_unit": {
-      "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/5224354917"
-      },
+      "defaultValue": { "value": "ca-app-pub-3940256099942544/5224354917" },
       "valueType": "STRING"
     },
     "rewarded_admanager_unit": {
-      "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/5224354917"
-      },
+      "defaultValue": { "value": "ca-app-pub-3940256099942544/5224354917" },
       "valueType": "STRING"
     },
     "native_ad_unit": {
-      "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/2247696110"
-      },
+      "defaultValue": { "value": "ca-app-pub-3940256099942544/2247696110" },
       "valueType": "STRING"
     },
     "native_admanager_unit": {
-      "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/2247696110"
-      },
+      "defaultValue": { "value": "ca-app-pub-3940256099942544/2247696110" },
       "valueType": "STRING"
     },
     "admob_app_open_android": {
-      "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/9257395921"
-      },
+      "defaultValue": { "value": "ca-app-pub-3940256099942544/9257395921" },
       "valueType": "STRING"
     },
     "admanager_app_open": {
-      "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/9257395921"
-      },
+      "defaultValue": { "value": "ca-app-pub-3940256099942544/9257395921" },
       "valueType": "STRING"
     },
     "banner_ad_unit": {
-      "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/6300978111"
-      },
+      "defaultValue": { "value": "ca-app-pub-3940256099942544/6300978111" },
       "valueType": "STRING"
     },
     "banner_admanager_unit": {
-      "defaultValue": {
-        "value": "/21775744923/example/adaptive-banner"
-      },
+      "defaultValue": { "value": "/21775744923/example/adaptive-banner" },
       "valueType": "STRING"
     },
     "facebook_app_id": {
-      "defaultValue": {
-        "value": ""
-      },
+      "defaultValue": { "value": "" },
       "valueType": "STRING"
     },
     "facebook_client_token": {
-      "defaultValue": {
-        "value": ""
-      },
+      "defaultValue": { "value": "" },
       "valueType": "STRING"
     },
     "event_mining_multiplier": {
-      "defaultValue": {
-        "value": "1.0"
-      },
+      "defaultValue": { "value": "1.0" },
       "valueType": "STRING"
     },
     "event_rig_discount": {
-      "defaultValue": {
-        "value": "0.0"
-      },
+      "defaultValue": { "value": "0.0" },
       "valueType": "STRING"
     },
     "first_24h_bundle_discount_percent": {
-      "defaultValue": {
-        "value": "0"
-      },
+      "defaultValue": { "value": "0" },
       "valueType": "STRING"
     }
   }

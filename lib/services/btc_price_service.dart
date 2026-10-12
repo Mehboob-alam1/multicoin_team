@@ -36,9 +36,11 @@ class BtcPriceService extends ChangeNotifier {
   bool get loading => _loading;
   bool get isPriceUp => _priceChange24h != null && _priceChange24h! >= 0;
 
-  double? getPrice(String coinId) => _pricesByCoin[coinId] ?? (coinId == 'btc' ? _priceUsd : null);
+  double? getPrice(String coinId) =>
+      _pricesByCoin[coinId] ?? ((coinId == 'sol' || coinId == 'btc') ? _priceUsd : null);
   List<BtcPricePoint> getChartData(String coinId) =>
-      List.unmodifiable(_chartDataByCoin[coinId] ?? (coinId == 'btc' ? _chartData : []));
+      List.unmodifiable(_chartDataByCoin[coinId] ??
+          ((coinId == 'sol' || coinId == 'btc') ? _chartData : []));
 
   /// Current balance worth in USD (balance * price) for a given coin.
   double? balanceWorthUsdForCoin(String coinId, double balance) {
@@ -46,7 +48,7 @@ class BtcPriceService extends ChangeNotifier {
     return p == null ? null : balance * p;
   }
 
-  /// Legacy: BTC balance worth in USD.
+  /// Legacy: SOL balance worth in USD.
   double? balanceWorthUsd(double btcBalance) {
     if (_priceUsd == null) return null;
     return btcBalance * _priceUsd!;
@@ -78,7 +80,11 @@ class BtcPriceService extends ChangeNotifier {
     try {
       await _fetchBtcMarketData();
       await _fetchChart(30);
-      if (_priceUsd != null) _pricesByCoin['btc'] = _priceUsd!;
+      if (_priceUsd != null) {
+        _pricesByCoin['sol'] = _priceUsd!;
+        _pricesByCoin['btc'] = _priceUsd!;
+      }
+      _chartDataByCoin['sol'] = List.from(_chartData);
       _chartDataByCoin['btc'] = List.from(_chartData);
     } finally {
       _loading = false;
@@ -90,7 +96,7 @@ class BtcPriceService extends ChangeNotifier {
   Future<void> _fetchBtcMarketData() async {
     try {
       final r = await http.get(Uri.parse(
-        '$_base/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false&market_data=true',
+        '$_base/coins/solana?localization=false&tickers=false&community_data=false&developer_data=false&market_data=true',
       ));
       if (r.statusCode != 200) throw Exception('${r.statusCode}');
       final map = jsonDecode(r.body) as Map<String, dynamic>;
@@ -117,7 +123,7 @@ class BtcPriceService extends ChangeNotifier {
 
   /// Fetch price and chart for the given coin ids (e.g. selected mining coins).
   Future<void> fetchForCoins(List<String> coinIds, {int chartDays = 30}) async {
-    if (coinIds.isEmpty) coinIds = ['btc'];
+    if (coinIds.isEmpty) coinIds = ['sol'];
     _loading = true;
     _error = null;
     notifyListeners();
@@ -127,14 +133,14 @@ class BtcPriceService extends ChangeNotifier {
           .where((x) => _coingeckoIds.containsValue(x) || x == 'bitcoin')
           .toSet()
           .toList();
-      if (cgIds.isEmpty) cgIds.add('bitcoin');
+      if (cgIds.isEmpty) cgIds.add('solana');
       await _fetchPrices(cgIds);
       for (final coinId in coinIds) {
-        final cgId = _coingeckoIds[coinId] ?? (coinId == 'btc' ? 'bitcoin' : null);
+        final cgId = _coingeckoIds[coinId] ?? (coinId == 'sol' ? 'solana' : (coinId == 'btc' ? 'bitcoin' : null));
         if (cgId != null) await _fetchChartFor(cgId, coinId, chartDays);
       }
-      if (_priceUsd == null && _pricesByCoin.containsKey('btc')) _priceUsd = _pricesByCoin['btc'];
-      if (_chartData.isEmpty && _chartDataByCoin.containsKey('btc')) _chartData = _chartDataByCoin['btc']!;
+      if (_priceUsd == null && _pricesByCoin.containsKey('sol')) _priceUsd = _pricesByCoin['sol'];
+      if (_chartData.isEmpty && _chartDataByCoin.containsKey('sol')) _chartData = _chartDataByCoin['sol']!;
     } finally {
       _loading = false;
       notifyListeners();
@@ -143,17 +149,17 @@ class BtcPriceService extends ChangeNotifier {
 
   static String? _gameCoinId(String cgId) {
     for (final e in _coingeckoIds.entries) if (e.value == cgId) return e.key;
-    return cgId == 'bitcoin' ? 'btc' : null;
+    return cgId == 'solana' ? 'sol' : (cgId == 'bitcoin' ? 'btc' : null);
   }
 
   Future<void> _fetchPrice() async {
     try {
-      final r = await http.get(Uri.parse('$_base/simple/price?ids=bitcoin&vs_currencies=usd'));
+      final r = await http.get(Uri.parse('$_base/simple/price?ids=solana&vs_currencies=usd'));
       if (r.statusCode != 200) throw Exception('${r.statusCode}');
       final map = jsonDecode(r.body) as Map<String, dynamic>;
-      final btc = map['bitcoin'];
-      if (btc is! Map) throw Exception('Invalid response');
-      _priceUsd = (btc['usd'] as num).toDouble();
+      final sol = map['solana'];
+      if (sol is! Map) throw Exception('Invalid response');
+      _priceUsd = (sol['usd'] as num).toDouble();
     } catch (e) {
       _error = e.toString();
     }
@@ -172,7 +178,7 @@ class BtcPriceService extends ChangeNotifier {
           final price = (data['usd'] as num).toDouble();
           final coinId = _gameCoinId(cgId) ?? cgId;
           _pricesByCoin[coinId] = price;
-          if (cgId == 'bitcoin') _priceUsd = price;
+          if (cgId == 'solana' || cgId == 'bitcoin') _priceUsd = price;
         }
       }
     } catch (e) {
@@ -182,7 +188,7 @@ class BtcPriceService extends ChangeNotifier {
 
   Future<void> _fetchChart(int days) async {
     try {
-      final r = await http.get(Uri.parse('$_base/coins/bitcoin/market_chart?vs_currency=usd&days=$days'));
+      final r = await http.get(Uri.parse('$_base/coins/solana/market_chart?vs_currency=usd&days=$days'));
       if (r.statusCode != 200) throw Exception('${r.statusCode}');
       final map = jsonDecode(r.body) as Map<String, dynamic>;
       final prices = map['prices'] as List<dynamic>?;
@@ -220,7 +226,7 @@ class BtcPriceService extends ChangeNotifier {
           .toList();
       list.sort((a, b) => a.time.compareTo(b.time));
       _chartDataByCoin[coinId] = list;
-      if (coinId == 'btc') _chartData = list;
+      if (coinId == 'sol' || coinId == 'btc') _chartData = list;
     } catch (e) {
       _error = e.toString();
     }

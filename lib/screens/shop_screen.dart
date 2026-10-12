@@ -1,35 +1,60 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import '../config/mining_economy.dart';
 import '../models/shop_product.dart';
+import '../services/ad_remote_config_service.dart';
 import '../services/event_service.dart';
 import '../services/game_state_service.dart';
-import '../services/ad_remote_config_service.dart';
 import '../services/iap_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/minimizable_native_ad.dart';
+import '../widgets/screen_ad_slot.dart';
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
 class _D {
-  static const bg       = Color(0xFFF7F8FA);
-  static const surface  = Color(0xFFFFFFFF);
-  static const card     = Color(0xFFFFFFFF);
-  static const cardBord = Color(0xFFE2E8F0);
-  static const gold     = Color(0xFFF59E0B);
-  static const goldDark = Color(0xFFD97706);
-  static const electric = Color(0xFF0EA5E9);
-  static const green    = Color(0xFF22C55E);
-  static const purple   = Color(0xFFA855F7);
-  static const pink     = Color(0xFFEC4899);
-  static const orange   = Color(0xFFF97316);
-  static const textHi   = Color(0xFF0D0F12);
-  static const textMid  = Color(0xFF6B7280);
-  static const textLow  = Color(0xFF9CA3AF);
+  static const bg = Color(0xFF08080A);
+  static const surface = Color(0xFF18181C);
+  static const gold = Color(0xFF9945FF);
+  static const goldText = Color(0xFFE9D5FF);
+  static const goldBg = Color(0xFF1A1228);
+  static const goldBdr = Color(0x669945FF);
+  static const green = Color(0xFF14F195);
+  static const greenBg = Color(0xFF0A2E22);
+  static const greenBdr = Color(0x6614F195);
+  static const electric = Color(0xFF38BDF8);
+  static const electricBg = Color(0xFF0C1A24);
+  static const electricBdr = Color(0xFF164E63);
+  static const violet = Color(0xFFA78BFA);
+  static const orange = Color(0xFFF97316);
+  static const textHi = Color(0xFFF4F4F5);
+  static const textMid = Color(0xFFA1A1AA);
+  static const textLow = Color(0xFF71717A);
+  static const line = Color(0x1FFFFFFF);
 }
 
-// ─── Tab model ────────────────────────────────────────────────────────────────
+TextStyle _sg({
+  double size = 14,
+  FontWeight weight = FontWeight.w500,
+  Color color = _D.textHi,
+  double? spacing,
+  double? height,
+}) =>
+    GoogleFonts.spaceGrotesk(
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+      letterSpacing: spacing,
+      height: height,
+    );
+
+TextStyle _mono({
+  double size = 13,
+  FontWeight weight = FontWeight.w700,
+  Color color = _D.textHi,
+}) =>
+    GoogleFonts.jetBrainsMono(fontSize: size, fontWeight: weight, color: color, height: 1.1);
+
 class _Tab {
   final String label;
   final IconData icon;
@@ -38,12 +63,11 @@ class _Tab {
 }
 
 const _tabs = [
-  _Tab('Rigs',     Icons.memory_rounded,              _D.electric),
-  _Tab('One-time', Icons.card_giftcard_rounded,        _D.gold),
-  _Tab('Premium',  Icons.workspace_premium_rounded,    _D.purple),
+  _Tab('Rigs', Icons.memory_rounded, _D.electric),
+  _Tab('One-time', Icons.card_giftcard_rounded, _D.gold),
+  _Tab('Premium', Icons.workspace_premium_rounded, _D.violet),
 ];
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
 class ShopScreen extends StatefulWidget {
   const ShopScreen({super.key});
 
@@ -51,23 +75,21 @@ class ShopScreen extends StatefulWidget {
   State<ShopScreen> createState() => _ShopScreenState();
 }
 
-class _ShopScreenState extends State<ShopScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController =
-  TabController(length: 3, vsync: this);
+class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateMixin {
+  late final TabController _tabsController = TabController(length: 3, vsync: this);
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabsController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final game   = context.watch<GameStateService>();
-    final iap    = context.watch<IapService>();
+    final game = context.watch<GameStateService>();
+    final iap = context.watch<IapService>();
     final events = context.watch<EventService>();
-    final adCfg  = context.watch<AdRemoteConfigService>();
+    final adCfg = context.watch<AdRemoteConfigService>();
 
     return Theme(
       data: _darkTheme(),
@@ -75,43 +97,27 @@ class _ShopScreenState extends State<ShopScreen>
         backgroundColor: _D.bg,
         body: Stack(
           children: [
-            // Ambient glows
-            Positioned(
-              top: -60,
-              right: -80,
-              child: _Blob(color: _D.gold.withValues(alpha: 0.06), size: 320),
-            ),
-            Positioned(
-              bottom: 80,
-              left: -60,
-              child: _Blob(color: _D.purple.withValues(alpha: 0.05), size: 260),
-            ),
-
+            const Positioned.fill(child: CustomPaint(painter: _MeshPainter())),
             SafeArea(
+              bottom: false,
               child: Column(
                 children: [
-                  // ── App bar ──────────────────────────────────────────
                   _ShopAppBar(game: game, iap: iap),
-
-                  // ── Hero card ────────────────────────────────────────
-                  _HeroCard(game: game),
-                  const SizedBox(height: 4),
-
-                  // ── Ad ───────────────────────────────────────────────
-                  if (adCfg.adsActive)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-                      child: MinimizableNativeAd(title: 'Sponsored deal'),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                    child: _HeroCard(game: game),
+                  ),
+                  if (adCfg.shouldShowSdkAds && !game.isPremiumActive)
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
+                      child: ScreenAdSlot(title: 'Shop offer'),
                     ),
-
-                  // ── Tab bar ──────────────────────────────────────────
-                  _ShopTabBar(controller: _tabController),
-                  const SizedBox(height: 4),
-
-                  // ── Tab views ────────────────────────────────────────
+                  const SizedBox(height: 12),
+                  _ShopTabBar(controller: _tabsController),
+                  const SizedBox(height: 6),
                   Expanded(
                     child: TabBarView(
-                      controller: _tabController,
+                      controller: _tabsController,
                       children: [
                         _RigsTab(game: game, events: events),
                         _OneTimeTab(game: game, iap: iap, adCfg: adCfg),
@@ -129,462 +135,409 @@ class _ShopScreenState extends State<ShopScreen>
   }
 }
 
-// ─── App bar ──────────────────────────────────────────────────────────────────
 class _ShopAppBar extends StatelessWidget {
   final GameStateService game;
   final IapService iap;
+
   const _ShopAppBar({required this.game, required this.iap});
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 12, 12, 4),
-    child: Row(children: [
-      const Icon(Icons.shopping_bag_rounded, color: _D.gold, size: 20),
-      const SizedBox(width: 10),
-      const Text(
-        'SHOP',
-        style: TextStyle(
-          color: _D.gold,
-          fontFamily: AppTheme.fontFamily,
-          fontWeight: FontWeight.w700,
-          fontSize: 15,
-          letterSpacing: 2.5,
-        ),
-      ),
-      const Spacer(),
-      // Balance pill
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: _D.gold.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _D.gold.withValues(alpha: 0.3)),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.currency_bitcoin, color: _D.gold, size: 14),
-          const SizedBox(width: 4),
-          Text(
-            game.btcBalance.toStringAsFixed(4),
-            style: const TextStyle(
-              color: _D.gold,
-              fontFamily: AppTheme.fontFamily,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 16, 8),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: _D.goldBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _D.goldBdr),
+            ),
+            child: const Icon(Icons.shopping_bag_rounded, color: _D.gold, size: 18),
+          ),
+          const SizedBox(width: 11),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Shop', style: _sg(size: 16, weight: FontWeight.w700, spacing: -0.3)),
+              Text('UPGRADES', style: _sg(size: 9, weight: FontWeight.w700, color: _D.gold, spacing: 1.6)),
+            ],
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+            decoration: BoxDecoration(
+              color: _D.goldBg,
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(color: _D.goldBdr),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.hexagon_rounded, color: _D.gold, size: 13),
+                const SizedBox(width: 5),
+                Text(game.btcBalance.toStringAsFixed(4), style: _mono(size: 12, color: _D.goldText)),
+              ],
             ),
           ),
-        ]),
-      ),
-      const SizedBox(width: 8),
-      // Restore button
-      GestureDetector(
-        onTap: iap.loading ? null : () => iap.restorePurchases(),
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: _D.cardBord,
-            borderRadius: BorderRadius.circular(10),
+          const SizedBox(width: 8),
+          _RoundButton(
+            icon: Icons.restore_rounded,
+            enabled: !iap.loading,
+            onTap: iap.loading ? null : () => iap.restorePurchases(),
           ),
-          child: Icon(
-            Icons.restore_rounded,
-            color: iap.loading ? _D.textLow : _D.textMid,
-            size: 18,
-          ),
-        ),
+        ],
       ),
-    ]),
-  );
+    );
+  }
 }
 
-// ─── Hero card ────────────────────────────────────────────────────────────────
 class _HeroCard extends StatelessWidget {
   final GameStateService game;
   const _HeroCard({required this.game});
 
   @override
   Widget build(BuildContext context) {
-    final isPremium = game.isPremiumActive;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isPremium
-              ? _D.gold.withValues(alpha: 0.08)
-              : _D.card,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isPremium
-                ? _D.gold.withValues(alpha: 0.35)
-                : _D.cardBord,
-          ),
-        ),
-        child: Row(children: [
-          Icon(
-            isPremium ? Icons.workspace_premium_rounded : Icons.trending_up_rounded,
-            color: isPremium ? _D.gold : _D.electric,
-            size: 22,
+    final premium = game.isPremiumActive;
+    return _Glass(
+      tint: premium ? const Color(0xC01A1228) : const Color(0xB318181C),
+      border: premium ? _D.goldBdr : _D.line,
+      child: Row(
+        children: [
+          _IconTile(
+            icon: premium ? Icons.workspace_premium_rounded : Icons.trending_up_rounded,
+            color: premium ? _D.gold : _D.electric,
+            tint: premium ? _D.goldBg : _D.electricBg,
+            border: premium ? _D.goldBdr : _D.electricBdr,
           ),
           const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(
-              isPremium ? 'Premium active — extend for more gains' : 'Grow faster with packs & premium',
-              style: TextStyle(
-                color: isPremium ? _D.gold : _D.textHi,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  premium ? 'Premium is active' : 'Grow faster with packs',
+                  style: _sg(size: 14.5, weight: FontWeight.w700),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  premium
+                      ? 'Stack boosts and events on your 1.5× rate.'
+                      : 'Packs and premium cut the grind significantly.',
+                  style: _sg(size: 12, color: _D.textMid, height: 1.3),
+                ),
+              ],
             ),
-            const SizedBox(height: 2),
-            Text(
-              isPremium
-                  ? 'Stack boosts and events on top of your 1.5× rate.'
-                  : 'Starter packs and premium cut grind time significantly.',
-              style: const TextStyle(color: _D.textMid, fontSize: 11),
-            ),
-          ])),
-          if (isPremium) ...[
+          ),
+          if (premium) ...[
             const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: _D.gold.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _D.gold.withValues(alpha: 0.35)),
-              ),
-              child: const Text('ACTIVE',
-                  style: TextStyle(color: _D.gold, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1)),
-            ),
+            Text('ACTIVE', style: _sg(size: 9, weight: FontWeight.w800, color: _D.goldText, spacing: 0.8)),
           ],
-        ]),
+        ],
       ),
     );
   }
 }
 
-// ─── Custom tab bar ───────────────────────────────────────────────────────────
 class _ShopTabBar extends StatelessWidget {
   final TabController controller;
   const _ShopTabBar({required this.controller});
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: controller,
-    builder: (_, __) => Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: List.generate(_tabs.length, (i) {
-          final t       = _tabs[i];
-          final active  = controller.index == i;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => controller.animateTo(i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: EdgeInsets.only(right: i < _tabs.length - 1 ? 8 : 0),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: active ? t.accent.withValues(alpha: 0.14) : _D.card,
-                  borderRadius: BorderRadius.circular(11),
-                  border: Border.all(
-                    color: active ? t.accent.withValues(alpha: 0.5) : _D.cardBord,
-                    width: active ? 1.5 : 1,
-                  ),
-                ),
-                child: Column(children: [
-                  Icon(t.icon, color: active ? t.accent : _D.textLow, size: 18),
-                  const SizedBox(height: 4),
-                  Text(
-                    t.label,
-                    style: TextStyle(
-                      color: active ? t.accent : _D.textLow,
-                      fontSize: 11,
-                      fontWeight: active ? FontWeight.w700 : FontWeight.normal,
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, __) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: _Glass(
+          padding: const EdgeInsets.all(4),
+          radius: 18,
+          child: Row(
+            children: List.generate(_tabs.length, (index) {
+              final tab = _tabs[index];
+              final active = controller.index == index;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    controller.animateTo(index);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: active ? tab.accent.withValues(alpha: 0.14) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: active ? tab.accent.withValues(alpha: 0.35) : Colors.transparent),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(tab.icon, color: active ? tab.accent : _D.textLow, size: 15),
+                        const SizedBox(width: 5),
+                        Text(tab.label, style: _sg(size: 12, weight: FontWeight.w700, color: active ? tab.accent : _D.textLow)),
+                      ],
                     ),
                   ),
-                ]),
-              ),
-            ),
-          );
-        }),
-      ),
-    ),
-  );
-}
-
-// ─── Rigs tab ─────────────────────────────────────────────────────────────────
-class _RigsTab extends StatelessWidget {
-  final GameStateService game;
-  final EventService events;
-  const _RigsTab({required this.game, required this.events});
-
-  @override
-  Widget build(BuildContext context) => ListView(
-    physics: const BouncingScrollPhysics(),
-    padding: EdgeInsets.fromLTRB(AppTheme.pagePaddingH, 12, AppTheme.pagePaddingH, AppTheme.pageBottomPadding(context)),
-    children: [
-      // Sale banner
-      if (events.rigDiscount > 0) ...[
-        _SaleBanner(discount: events.rigDiscount),
-        const SizedBox(height: 10),
-      ],
-
-      // Tip card
-      _TipCard(
-        icon:    Icons.auto_graph_rounded,
-        accent:  _D.electric,
-        text:    'Earlier rig upgrades snowball your BTC output. Upgrade your farm tier on the Mining Farm tab.',
-      ),
-      const SizedBox(height: 14),
-
-      _SectionLabel(label: 'RIGS (USD ONLY)'),
-      const SizedBox(height: 8),
-      _TipCard(
-        icon:    Icons.storefront_rounded,
-        accent:  _D.green,
-        text:    'Rigs are bought only on the Mining Farm tab (USD / Google Play), with live prices. This shop has packs, boosts, and other upgrades — not individual rigs.',
-      ),
-      const SizedBox(height: 14),
-      SizedBox(
-        width: double.infinity,
-        child: OutlinedButton.icon(
-          onPressed: () => Navigator.pushNamed(context, '/farm'),
-          icon: const Icon(Icons.warehouse_rounded, size: 20),
-          label: const Text('Open Mining Farm'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: _D.gold,
-            side: BorderSide(color: _D.gold.withValues(alpha: 0.5)),
-            padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              );
+            }),
           ),
         ),
       ),
-    ],
-  );
+    );
+  }
 }
 
-// ─── One-time tab ─────────────────────────────────────────────────────────────
+class _RigsTab extends StatelessWidget {
+  final GameStateService game;
+  final EventService events;
+
+  const _RigsTab({required this.game, required this.events});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: AppTheme.pageScroll,
+      padding: EdgeInsets.fromLTRB(20, 12, 20, AppTheme.pageBottomPadding(context)),
+      children: [
+        if (events.rigDiscount > 0) ...[
+          _Notice(
+            icon: Icons.local_offer_rounded,
+            color: _D.orange,
+            text: '${(events.rigDiscount * 100).toStringAsFixed(0)}% rig sale is active this week.',
+          ),
+          const SizedBox(height: 12),
+        ],
+        const _Notice(
+          icon: Icons.auto_graph_rounded,
+          color: _D.electric,
+          text: 'Earlier rig upgrades snowball your SOL output. Upgrade the farm tier from Mining Farm.',
+        ),
+        const SizedBox(height: 18),
+        const _SectionLabel('Rigs'),
+        const SizedBox(height: 12),
+        const _Notice(
+          icon: Icons.storefront_rounded,
+          color: _D.green,
+          text: 'Individual rigs are purchased only on Mining Farm with Google Play. This shop has packs, boosts, and premium.',
+        ),
+        const SizedBox(height: 16),
+        _GradientButton(
+          label: 'Open Mining Farm',
+          icon: Icons.warehouse_rounded,
+          onTap: () => Navigator.pushNamed(context, '/farm'),
+        ),
+      ],
+    );
+  }
+}
+
 class _OneTimeTab extends StatelessWidget {
   final GameStateService game;
   final IapService iap;
   final AdRemoteConfigService adCfg;
+
   const _OneTimeTab({required this.game, required this.iap, required this.adCfg});
 
   @override
-  Widget build(BuildContext context) => ListView(
-    physics: const BouncingScrollPhysics(),
-    padding: EdgeInsets.fromLTRB(AppTheme.pagePaddingH, 12, AppTheme.pagePaddingH, AppTheme.pageBottomPadding(context)),
-    children: [
-      if (iap.error != null) ...[
-        _ErrorBanner(message: iap.error!),
-        const SizedBox(height: 10),
-      ],
-
-      _TipCard(
-        icon:   Icons.local_fire_department_rounded,
-        accent: _D.gold,
-        text:   'Permanent rate bonuses apply to all mining and stack with your farm, session, and premium.',
-      ),
-      const SizedBox(height: 14),
-
-      _SectionLabel(label: 'PACKS'),
-      if (adCfg.first24hBundleDiscountPercent > 0) ...[
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: _D.gold.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: _D.gold.withValues(alpha: 0.3)),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.local_offer_rounded, color: _D.gold, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                'Limited time: Starter pack ${adCfg.first24hBundleDiscountPercent}% off',
-                style: const TextStyle(color: _D.gold, fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: AppTheme.pageScroll,
+      padding: EdgeInsets.fromLTRB(20, 12, 20, AppTheme.pageBottomPadding(context)),
+      children: [
+        if (iap.error != null) ...[
+          _Notice(icon: Icons.error_outline_rounded, color: _D.orange, text: iap.error!),
+          const SizedBox(height: 12),
+        ],
+        const _Notice(
+          icon: Icons.local_fire_department_rounded,
+          color: _D.gold,
+          text: 'Permanent rate bonuses apply to all mining and stack with farm, session, and premium.',
         ),
-        const SizedBox(height: 10),
-      ],
-      const SizedBox(height: 10),
-
-      ...ShopProducts.shopPacks.map((product) {
-        final purchased    = !ShopProducts.isConsumableGoogleProduct(product.id) &&
-            game.hasPurchasedOneTime(product.id);
-        final storeProduct = iap.getProduct(product.googleProductId);
-        final priceStr     = storeProduct?.price ?? product.price;
-        final canBuyBtc    = product.isBtcPrice &&
-            game.btcBalance >= _parseBtcPrice(product.price);
-        final playReady    = iap.isGoogleProductReady(product.googleProductId);
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: _OneTimeCard(
-            product:    product,
-            priceStr:   priceStr,
-            purchased:  purchased,
-            canBuy:     product.isBtcPrice ? canBuyBtc : playReady,
-            iapAvail:   playReady,
-            onPurchase: () => _onPurchase(context, product),
+        const SizedBox(height: 18),
+        const _SectionLabel('Packs'),
+        if (adCfg.first24hBundleDiscountPercent > 0) ...[
+          const SizedBox(height: 12),
+          _Notice(
+            icon: Icons.local_offer_rounded,
+            color: _D.gold,
+            text: 'Limited time: Starter pack ${adCfg.first24hBundleDiscountPercent}% off',
           ),
-        );
-      }),
-    ],
-  );
-
-  double _parseBtcPrice(String price) {
-    final s = price.replaceAll(RegExp(r'[^\d.]'), '');
-    return double.tryParse(s) ?? 0;
+        ],
+        const SizedBox(height: 12),
+        ...ShopProducts.shopPacks.map((product) {
+          final purchased = !ShopProducts.isConsumableGoogleProduct(product.id) && game.hasPurchasedOneTime(product.id);
+          final storeProduct = iap.getProduct(product.googleProductId);
+          final price = storeProduct?.price ?? product.price;
+          final playReady = iap.isGoogleProductReady(product.googleProductId);
+          final canBuy = product.isBtcPrice ? game.btcBalance >= _parseBtcPrice(product.price) : playReady;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _OneTimeCard(
+              product: product,
+              price: price,
+              purchased: purchased,
+              canBuy: canBuy,
+              playReady: playReady,
+              onPurchase: () => _purchase(context, product),
+            ),
+          );
+        }),
+      ],
+    );
   }
 
-  Future<void> _onPurchase(BuildContext context, OneTimeProduct product) async {
+  double _parseBtcPrice(String price) => double.tryParse(price.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0;
+
+  Future<void> _purchase(BuildContext context, OneTimeProduct product) async {
     if (product.isBtcPrice) {
-      const cost = 0.00005;
+      final cost = MiningEconomy.toSol(0.00005);
       if (!game.canSpendBtc(cost)) {
-        _toast(context, 'Need 0.00005 BTC'); return;
+        _toast(context, 'Need ${cost.toStringAsFixed(4)} SOL');
+        return;
       }
       await game.deductBtc(cost);
       await game.activateBoost1h();
       await game.applyOneTimePurchase(productId: product.id);
-      if (context.mounted) _toast(context, '⚡ 2× Boost active for 1 hour!');
+      if (context.mounted) _toast(context, '2× boost active for 1 hour');
       return;
     }
     final success = await iap.buyProduct(product.googleProductId);
     if (context.mounted) {
-      _toast(context, success
-          ? 'Complete purchase in Google Play.'
-          : (iap.error ?? 'Google Play product unavailable. Check Play Console IDs.'));
+      _toast(
+        context,
+        success ? 'Complete purchase in Google Play.' : (iap.error ?? 'Google Play product unavailable. Check Play Console IDs.'),
+      );
     }
   }
 }
 
 class _OneTimeCard extends StatelessWidget {
   final OneTimeProduct product;
-  final String priceStr;
+  final String price;
   final bool purchased;
   final bool canBuy;
-  final bool iapAvail;
+  final bool playReady;
   final VoidCallback onPurchase;
+
   const _OneTimeCard({
     required this.product,
-    required this.priceStr,
+    required this.price,
     required this.purchased,
     required this.canBuy,
-    required this.iapAvail,
+    required this.playReady,
     required this.onPurchase,
   });
 
   @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: purchased ? _D.green.withValues(alpha: 0.05) : _D.card,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(
-        color: purchased ? _D.green.withValues(alpha: 0.25) : _D.cardBord,
-      ),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Text(product.icon, style: const TextStyle(fontSize: 30)),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(product.name,
-                style: const TextStyle(color: _D.textHi, fontWeight: FontWeight.w700, fontSize: 15)),
-            const SizedBox(height: 2),
-            Text(product.description,
-                style: const TextStyle(color: _D.textMid, fontSize: 12)),
-          ])),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: _D.gold.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _D.gold.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.attach_money, color: _D.gold, size: 14),
-                Text(
-                  product.isBtcPrice ? priceStr : (priceStr.startsWith('\$') ? priceStr : '\$' + priceStr) + (priceStr.toUpperCase().contains('USD') ? '' : ' USD'),
-                  style: const TextStyle(
-                    color: _D.gold,
-                    fontFamily: AppTheme.fontFamily,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
+  Widget build(BuildContext context) {
+    final label = purchased
+        ? 'Owned'
+        : product.isBtcPrice
+        ? 'Buy with SOL'
+        : (playReady ? 'Buy with Google Play' : 'Unavailable in Play');
+    return _Glass(
+      tint: purchased ? const Color(0xC00A2E22) : const Color(0xB318181C),
+      border: purchased ? _D.greenBdr : _D.line,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(product.icon, style: const TextStyle(fontSize: 30)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(product.name, style: _sg(size: 16, weight: FontWeight.w700, spacing: -0.2)),
+                    const SizedBox(height: 3),
+                    Text(product.description, style: _sg(size: 12.5, color: _D.textMid, height: 1.3)),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                product.isBtcPrice ? price : _usd(price),
+                style: _mono(size: 12, color: _D.goldText),
+              ),
+            ],
           ),
-        ]),
-        const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          child: _GoldBtn(
-            label: purchased
-                ? 'Owned'
-                : product.isBtcPrice
-                ? 'Buy with BTC'
-                : (iapAvail ? 'Buy with Google Play' : 'Unavailable in Play'),
+          const SizedBox(height: 14),
+          _GradientButton(
+            label: label,
+            icon: purchased ? Icons.check_circle_rounded : Icons.shopping_bag_outlined,
             enabled: !purchased && canBuy,
             onTap: onPurchase,
-            showCheck: purchased,
           ),
-        ),
-      ]),
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
-// ─── Premium tab ──────────────────────────────────────────────────────────────
 class _PremiumTab extends StatelessWidget {
   final GameStateService game;
   final IapService iap;
+
   const _PremiumTab({required this.game, required this.iap});
 
   @override
   Widget build(BuildContext context) {
-    final isPremium = game.isPremiumActive;
-    final expiry    = game.isPremiumActive ? _formatExpiry(game.premiumExpiry) : null;
-
+    final premium = game.isPremiumActive;
+    final expiry = game.premiumExpiry;
     return ListView(
-      physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(AppTheme.pagePaddingH, 12, AppTheme.pagePaddingH, AppTheme.pageBottomPadding(context)),
+      physics: AppTheme.pageScroll,
+      padding: EdgeInsets.fromLTRB(20, 12, 20, AppTheme.pageBottomPadding(context)),
       children: [
-        // Active badge
-        if (isPremium) ...[
-          _PremiumActiveBadge(expiry: expiry),
-          const SizedBox(height: 14),
-        ] else ...[
-          _TipCard(
-            icon:   Icons.workspace_premium_rounded,
-            accent: _D.purple,
-            text:   'Premium adds 1.5× to all mining (rigs × farm tier). Stacks with session bonus and 2× boosts.',
+        if (premium)
+          _Glass(
+            tint: const Color(0xC01A1228),
+            border: _D.goldBdr,
+            child: Row(
+              children: [
+                const _IconTile(icon: Icons.workspace_premium_rounded, color: _D.gold, tint: _D.goldBg, border: _D.goldBdr),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Premium active', style: _sg(size: 16, weight: FontWeight.w700, color: _D.goldText)),
+                      const SizedBox(height: 3),
+                      Text(
+                        '1.5× mining · No ads${expiry == null ? '' : ' · Until ${expiry.day}/${expiry.month}/${expiry.year}'}',
+                        style: _sg(size: 12, color: _D.textMid),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          const _Notice(
+            icon: Icons.workspace_premium_rounded,
+            color: _D.violet,
+            text: 'Premium adds 1.5× to all mining. It stacks with the session bonus and 2× boosts.',
           ),
-          const SizedBox(height: 14),
-        ],
-
-        _SectionLabel(label: 'PLANS'),
-        const SizedBox(height: 10),
-
+        const SizedBox(height: 18),
+        const _SectionLabel('Plans'),
+        const SizedBox(height: 12),
         ...ShopProducts.premiumPlans.map((plan) {
-          final storeProduct = iap.getProduct(plan.googleProductId);
-          final priceStr     = storeProduct?.price ?? plan.price;
+          final store = iap.getProduct(plan.googleProductId);
+          final price = store?.price ?? plan.price;
+          final featured = plan.period != 'month';
           return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 12),
             child: _PremiumPlanCard(
-              plan:        plan,
-              priceStr:    priceStr,
-              isPremium:   isPremium,
-              iapLoading:  iap.loading,
-              iapAvail:    iap.isGoogleProductReady(plan.googleProductId),
+              plan: plan,
+              price: price,
+              featured: featured,
+              premium: premium,
+              loading: iap.loading,
+              ready: iap.isGoogleProductReady(plan.googleProductId),
               onSubscribe: () => _subscribe(context, plan),
             ),
           );
@@ -593,425 +546,300 @@ class _PremiumTab extends StatelessWidget {
     );
   }
 
-  String _formatExpiry(DateTime? e) =>
-      e != null ? '${e.day}/${e.month}/${e.year}' : '';
-
   Future<void> _subscribe(BuildContext context, PremiumPlan plan) async {
     final success = await iap.buySubscription(plan.googleProductId);
-    if (context.mounted) {
-      _toast(context, success
+    if (!context.mounted) return;
+    _toast(
+      context,
+      success
           ? 'Complete in Google Play. Premium activates when the purchase finishes.'
-          : (iap.error ?? 'Google Play subscription unavailable. Check Play Console IDs.'));
-    }
+          : (iap.error ?? 'Google Play subscription unavailable. Check Play Console IDs.'),
+    );
   }
-}
-
-class _PremiumActiveBadge extends StatelessWidget {
-  final String? expiry;
-  const _PremiumActiveBadge({required this.expiry});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [Color(0xFF1E1800), Color(0xFF120F00)],
-      ),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: _D.gold.withValues(alpha: 0.4)),
-      boxShadow: [BoxShadow(color: _D.gold.withValues(alpha: 0.12), blurRadius: 20)],
-    ),
-    child: Row(children: [
-      Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: _D.gold.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.workspace_premium_rounded, color: _D.gold, size: 24),
-      ),
-      const SizedBox(width: 14),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Premium Active',
-            style: TextStyle(color: _D.gold, fontWeight: FontWeight.w800, fontSize: 15)),
-        const SizedBox(height: 2),
-        Text(
-          '1.5× mining rate · No ads${expiry != null ? ' · Until $expiry' : ''}',
-          style: const TextStyle(color: _D.textMid, fontSize: 12),
-        ),
-      ])),
-    ]),
-  );
 }
 
 class _PremiumPlanCard extends StatelessWidget {
   final PremiumPlan plan;
-  final String priceStr;
-  final bool isPremium;
-  final bool iapLoading;
-  final bool iapAvail;
+  final String price;
+  final bool featured;
+  final bool premium;
+  final bool loading;
+  final bool ready;
   final VoidCallback onSubscribe;
+
   const _PremiumPlanCard({
     required this.plan,
-    required this.priceStr,
-    required this.isPremium,
-    required this.iapLoading,
-    required this.iapAvail,
+    required this.price,
+    required this.featured,
+    required this.premium,
+    required this.loading,
+    required this.ready,
     required this.onSubscribe,
   });
 
   @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: _D.card,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: _D.cardBord),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: _D.purple.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(11),
-              border: Border.all(color: _D.purple.withValues(alpha: 0.25)),
+  Widget build(BuildContext context) {
+    final suffix = plan.period == 'month' ? '/mo' : '/yr';
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const _IconTile(icon: Icons.workspace_premium_rounded, color: _D.violet, tint: Color(0xFF1A1228), border: Color(0xFF4C1D95)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(plan.name, style: _sg(size: 16, weight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(plan.description, style: _sg(size: 12, color: _D.textMid, height: 1.3)),
+                ],
+              ),
             ),
-            child: const Icon(Icons.workspace_premium_rounded, color: _D.purple, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(plan.name,
-                style: const TextStyle(color: _D.textHi, fontWeight: FontWeight.w700, fontSize: 15)),
-            const SizedBox(height: 2),
-            Text(plan.description,
-                style: const TextStyle(color: _D.textMid, fontSize: 12)),
-          ])),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: _D.purple.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _D.purple.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.attach_money, color: _D.purple, size: 14),
-                Text(
-                  (priceStr.startsWith('\$') ? priceStr : '\$' + priceStr) + (priceStr.toUpperCase().contains('USD') ? '' : ' USD') + (plan.period == 'month' ? '/mo' : '/yr'),
-                  style: const TextStyle(
-                    color: _D.purple,
-                    fontFamily: AppTheme.fontFamily,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ]),
-
+            const SizedBox(width: 8),
+            Text(_usd(price, suffix: suffix), style: _mono(size: 12, color: featured ? _D.goldText : _D.violet)),
+          ],
+        ),
         if (plan.benefits.isNotEmpty) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Wrap(
             spacing: 6,
             runSpacing: 6,
-            children: plan.benefits.map((b) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: _D.purple.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(color: _D.purple.withValues(alpha: 0.2)),
-              ),
-              child: Text(b, style: const TextStyle(color: _D.purple, fontSize: 11, fontWeight: FontWeight.w600)),
-            )).toList(),
+            children: [
+              for (final benefit in plan.benefits)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: _D.violet.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(color: _D.violet.withValues(alpha: 0.24)),
+                  ),
+                  child: Text(benefit, style: _sg(size: 11, weight: FontWeight.w600, color: _D.violet)),
+                ),
+            ],
           ),
         ],
-
         const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          child: _PurpleBtn(
-            label: iapLoading
-                ? 'Loading…'
-                : isPremium
-                ? 'Extend'
-                : (iapAvail ? 'Subscribe with Google Play' : 'Unavailable in Play'),
-            onTap: onSubscribe,
-          ),
+        _GradientButton(
+          label: loading ? 'Loading…' : premium ? 'Extend' : (ready ? 'Subscribe with Google Play' : 'Unavailable in Play'),
+          icon: Icons.star_rounded,
+          enabled: !loading,
+          onTap: onSubscribe,
         ),
-      ]),
-    ),
-  );
-}
+      ],
+    );
 
-// ─── Shared small components ──────────────────────────────────────────────────
-class _SaleBanner extends StatelessWidget {
-  final double discount;
-  const _SaleBanner({required this.discount});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    decoration: BoxDecoration(
-      color: _D.orange.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: _D.orange.withValues(alpha: 0.35)),
-    ),
-    child: Row(children: [
-      const Icon(Icons.local_offer_rounded, color: _D.orange, size: 18),
-      const SizedBox(width: 8),
-      Text(
-        '${(discount * 100).toStringAsFixed(0)}% Rig Sale — Weekly event active!',
-        style: const TextStyle(color: _D.orange, fontWeight: FontWeight.w700, fontSize: 13),
+    if (!featured) return _Glass(child: content);
+    return Container(
+      padding: const EdgeInsets.all(1.2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(colors: [Color(0xFF9945FF), Color(0xFF14F195)]),
       ),
-    ]),
-  );
+      child: _Glass(radius: 23, tint: const Color(0xE6111114), border: Colors.transparent, child: content),
+    );
+  }
 }
 
-class _TipCard extends StatelessWidget {
+class _Notice extends StatelessWidget {
   final IconData icon;
-  final Color accent;
+  final Color color;
   final String text;
-  const _TipCard({required this.icon, required this.accent, required this.text});
+
+  const _Notice({required this.icon, required this.color, required this.text});
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    decoration: BoxDecoration(
-      color: accent.withValues(alpha: 0.06),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: accent.withValues(alpha: 0.2)),
-    ),
-    child: Row(children: [
-      Icon(icon, color: accent, size: 18),
-      const SizedBox(width: 10),
-      Expanded(child: Text(text,
-          style: const TextStyle(color: _D.textMid, fontSize: 12))),
-    ]),
-  );
-}
-
-class _ErrorBanner extends StatelessWidget {
-  final String message;
-  const _ErrorBanner({required this.message});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    decoration: BoxDecoration(
-      color: Colors.orange.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-    ),
-    child: Text(message, style: const TextStyle(color: Colors.orange, fontSize: 12)),
-  );
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.26)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: _sg(size: 12.5, color: _D.textMid, height: 1.35))),
+        ],
+      ),
+    );
+  }
 }
 
 class _SectionLabel extends StatelessWidget {
   final String label;
-  const _SectionLabel({required this.label});
+  const _SectionLabel(this.label);
 
-  @override
-  Widget build(BuildContext context) => Text(
-    label,
-    style: const TextStyle(
-      color: _D.textMid,
-      fontSize: 11,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 2,
-    ),
-  );
-}
-
-class _Pill extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _Pill({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(5),
-    ),
-    child: Text(label,
-        style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-  );
-}
-
-// ─── Buttons ──────────────────────────────────────────────────────────────────
-class _BuyBtn extends StatefulWidget {
-  final bool canBuy;
-  final bool isFull;
-  final VoidCallback onTap;
-  const _BuyBtn({required this.canBuy, required this.isFull, required this.onTap});
-
-  @override
-  State<_BuyBtn> createState() => _BuyBtnState();
-}
-
-class _BuyBtnState extends State<_BuyBtn> {
-  bool _p = false;
   @override
   Widget build(BuildContext context) {
-    final label = widget.isFull ? 'Full' : 'Buy';
+    return Row(
+      children: [
+        Container(width: 3, height: 14, decoration: BoxDecoration(color: _D.gold, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 10),
+        Text(label.toUpperCase(), style: _sg(size: 10, weight: FontWeight.w700, color: _D.textMid, spacing: 1.5)),
+      ],
+    );
+  }
+}
+
+class _IconTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final Color tint;
+  final Color border;
+
+  const _IconTile({required this.icon, required this.color, required this.tint, required this.border});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(13), border: Border.all(color: border)),
+      child: Icon(icon, color: color, size: 20),
+    );
+  }
+}
+
+class _RoundButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool enabled;
+
+  const _RoundButton({required this.icon, required this.onTap, this.enabled = true});
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: widget.canBuy ? (_) => setState(() => _p = true) : null,
-      onTapUp: widget.canBuy ? (_) { setState(() => _p = false); widget.onTap(); } : null,
-      onTapCancel: () => setState(() => _p = false),
-      child: AnimatedScale(
-        scale: _p ? 0.93 : 1.0,
-        duration: const Duration(milliseconds: 100),
+      onTap: enabled ? onTap : null,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.4,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          width: 38,
+          height: 38,
           decoration: BoxDecoration(
-            gradient: widget.canBuy
-                ? const LinearGradient(colors: [Color(0xFFF5A623), Color(0xFFE08800)])
-                : null,
-            color: widget.canBuy ? null : _D.cardBord,
-            borderRadius: BorderRadius.circular(9),
-            boxShadow: widget.canBuy
-                ? [BoxShadow(color: _D.gold.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 3))]
-                : null,
+            color: const Color(0xB318181C),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: _D.line),
           ),
-          child: Text(label,
-              style: TextStyle(
-                color: widget.canBuy ? Colors.black : _D.textLow,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-              )),
+          child: Icon(icon, color: _D.textMid, size: 18),
         ),
       ),
     );
   }
 }
 
-class _GoldBtn extends StatefulWidget {
+class _GradientButton extends StatelessWidget {
   final String label;
+  final IconData icon;
+  final VoidCallback onTap;
   final bool enabled;
-  final bool showCheck;
-  final VoidCallback onTap;
-  const _GoldBtn({required this.label, required this.enabled, required this.onTap, this.showCheck = false});
+
+  const _GradientButton({required this.label, required this.icon, required this.onTap, this.enabled = true});
 
   @override
-  State<_GoldBtn> createState() => _GoldBtnState();
-}
-
-class _GoldBtnState extends State<_GoldBtn> {
-  bool _p = false;
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTapDown: widget.enabled ? (_) => setState(() => _p = true) : null,
-    onTapUp: widget.enabled ? (_) { setState(() => _p = false); widget.onTap(); } : null,
-    onTapCancel: () => setState(() => _p = false),
-    child: AnimatedScale(
-      scale: _p ? 0.97 : 1.0,
-      duration: const Duration(milliseconds: 100),
-      child: Container(
-        height: 46,
-        decoration: BoxDecoration(
-          gradient: widget.enabled
-              ? const LinearGradient(colors: [Color(0xFFF5A623), Color(0xFFE08800)])
-              : null,
-          color: widget.enabled ? null : _D.cardBord,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: widget.enabled
-              ? [BoxShadow(color: _D.gold.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))]
-              : null,
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 160),
+        opacity: enabled ? 1 : 0.42,
+        child: Container(
+          height: 48,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFF9945FF), Color(0xFF14F195)]),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: Colors.white, size: 17),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: _sg(size: 13.5, weight: FontWeight.w800, color: Colors.white)),
+              ),
+            ],
+          ),
         ),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          if (widget.showCheck) ...[
-            const Icon(Icons.check_circle_rounded, color: _D.green, size: 16),
-            const SizedBox(width: 6),
-          ],
-          Text(widget.label,
-              style: TextStyle(
-                color: widget.enabled ? Colors.black : _D.textLow,
-                fontWeight: FontWeight.w800,
-                fontSize: 13,
-              )),
-        ]),
       ),
-    ),
-  );
+    );
+  }
 }
 
-class _PurpleBtn extends StatefulWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _PurpleBtn({required this.label, required this.onTap});
+class _Glass extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final double radius;
+  final Color tint;
+  final Color border;
+
+  const _Glass({
+    required this.child,
+    this.padding = const EdgeInsets.all(15),
+    this.radius = 22,
+    this.tint = const Color(0xB318181C),
+    this.border = _D.line,
+  });
 
   @override
-  State<_PurpleBtn> createState() => _PurpleBtnState();
-}
-
-class _PurpleBtnState extends State<_PurpleBtn> {
-  bool _p = false;
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTapDown: (_) => setState(() => _p = true),
-    onTapUp: (_) { setState(() => _p = false); widget.onTap(); },
-    onTapCancel: () => setState(() => _p = false),
-    child: AnimatedScale(
-      scale: _p ? 0.97 : 1.0,
-      duration: const Duration(milliseconds: 100),
-      child: Container(
-        height: 46,
-        decoration: BoxDecoration(
-          color: _D.purple.withValues(alpha: 0.18),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _D.purple.withValues(alpha: 0.5)),
-          boxShadow: [BoxShadow(color: _D.purple.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 4))],
-        ),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Icon(Icons.star_rounded, color: _D.purple, size: 16),
-          const SizedBox(width: 6),
-          Text(widget.label,
-              style: const TextStyle(color: _D.purple, fontWeight: FontWeight.w800, fontSize: 13)),
-        ]),
+  Widget build(BuildContext context) {
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: tint.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: border, width: 0.8),
       ),
-    ),
-  );
+      child: child,
+    );
+  }
 }
 
-class _Blob extends StatelessWidget {
-  final Color color;
-  final double size;
-  const _Blob({required this.color, required this.size});
+class _MeshPainter extends CustomPainter {
+  const _MeshPainter();
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-    child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
-      child: const SizedBox.shrink(),
-    ),
-  );
+  void paint(Canvas canvas, Size size) {
+    void glow(Offset center, double radius, Color color) {
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()..shader = RadialGradient(colors: [color, color.withValues(alpha: 0)]).createShader(Rect.fromCircle(center: center, radius: radius)),
+      );
+    }
+
+    glow(Offset(size.width * 0.9, 10), 180, const Color(0x349945FF));
+    glow(Offset(-10, size.height * 0.72), 170, const Color(0x2238BDF8));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-void _toast(BuildContext context, String msg) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    content: Text(msg, style: const TextStyle(color: _D.textHi)),
-    backgroundColor: _D.card,
-    behavior: SnackBarBehavior.floating,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(10),
-      side: const BorderSide(color: _D.cardBord),
+String _usd(String raw, {String suffix = ''}) {
+  final priced = raw.startsWith('\$') ? raw : '\$$raw';
+  return priced + (raw.toUpperCase().contains('USD') ? '' : ' USD') + suffix;
+}
+
+void _toast(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message, style: _sg(size: 13, weight: FontWeight.w600)),
+      backgroundColor: _D.surface,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: _D.line)),
+      margin: const EdgeInsets.all(16),
     ),
-  ));
+  );
 }
 
 ThemeData _darkTheme() => ThemeData(
   brightness: Brightness.dark,
-  fontFamily: AppTheme.fontFamily,
-  textTheme: AppTheme.darkTextTheme,
+  fontFamily: GoogleFonts.spaceGrotesk().fontFamily,
   scaffoldBackgroundColor: _D.bg,
   colorScheme: const ColorScheme.dark(primary: _D.gold, surface: _D.surface),
 );

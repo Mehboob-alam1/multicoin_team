@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Fade and slide-in animation with optional delay. Uses [AnimationController]
-/// from [SingleTickerProviderStateMixin] or [TickerProviderStateMixin].
+/// Short fade, float, and scale entrance. Stops animating after the first play
+/// so long lists (dashboard) do not keep rebuilding on every frame.
 class FadeSlideIn extends StatefulWidget {
   final Widget child;
   final Duration delay;
@@ -13,8 +13,8 @@ class FadeSlideIn extends StatefulWidget {
     super.key,
     required this.child,
     this.delay = Duration.zero,
-    this.duration = const Duration(milliseconds: 400),
-    this.beginOffset = const Offset(0, 0.12),
+    this.duration = const Duration(milliseconds: 280),
+    this.beginOffset = const Offset(0, 0.08),
     this.curve = Curves.easeOutCubic,
   });
 
@@ -24,29 +24,30 @@ class FadeSlideIn extends StatefulWidget {
 
 class _FadeSlideInState extends State<FadeSlideIn>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _opacity;
-  late final Animation<Offset> _offset;
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: widget.duration,
+  );
+
+  late final Animation<double> _progress = CurvedAnimation(
+    parent: _controller,
+    curve: widget.curve,
+  );
+
+  bool _done = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: widget.duration,
-    );
-    _opacity = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: widget.curve),
-    );
-    _offset = Tween<Offset>(
-      begin: widget.beginOffset,
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: widget.curve));
-
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
+        setState(() => _done = true);
+      }
+    });
     if (widget.delay == Duration.zero) {
       _controller.forward();
     } else {
-      Future.delayed(widget.delay, () {
+      Future<void>.delayed(widget.delay, () {
         if (mounted) _controller.forward();
       });
     }
@@ -58,19 +59,29 @@ class _FadeSlideInState extends State<FadeSlideIn>
     super.dispose();
   }
 
+  Offset _pixelOffset(double t) {
+    final start = widget.beginOffset;
+    final dx = start.dx.abs() <= 1 ? start.dx * 18 : start.dx;
+    final dy = start.dy.abs() <= 1 ? start.dy * 80 : start.dy;
+    return Offset(dx * (1 - t), dy * (1 - t));
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_done) return widget.child;
     return AnimatedBuilder(
-      animation: _controller,
+      animation: _progress,
+      child: widget.child,
       builder: (context, child) {
+        final t = _progress.value;
         return Opacity(
-          opacity: _opacity.value,
+          opacity: t,
           child: Transform.translate(
-            offset: Offset(
-              _offset.value.dx * MediaQuery.of(context).size.width,
-              _offset.value.dy * MediaQuery.of(context).size.height,
+            offset: _pixelOffset(t),
+            child: Transform.scale(
+              scale: 0.97 + 0.03 * t,
+              child: child,
             ),
-            child: widget.child,
           ),
         );
       },

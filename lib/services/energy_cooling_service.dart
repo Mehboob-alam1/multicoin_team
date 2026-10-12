@@ -26,7 +26,10 @@ class EnergyCoolingService extends ChangeNotifier {
     notifyListeners();
   }
 
+  int _heatPersistTicks = 0;
+
   Future<void> tickHeat({required int rigs, required bool miningActive}) async {
+    final prev = _heat;
     if (miningActive) {
       _heat += (rigs * 0.03) + 0.08;
       _heat -= (_cooling * 0.12) + (_solar * 0.03);
@@ -35,8 +38,12 @@ class EnergyCoolingService extends ChangeNotifier {
     }
     if (_heat < 0) _heat = 0;
     if (_heat > 100) _heat = 100;
-    await LocalFeatureStore.set(_heatKey, _heat);
-    notifyListeners();
+    _heatPersistTicks++;
+    if (_heatPersistTicks >= 15) {
+      _heatPersistTicks = 0;
+      await LocalFeatureStore.set(_heatKey, _heat);
+    }
+    if ((_heat - prev).abs() >= 0.4) notifyListeners();
   }
 
   double get efficiencyMultiplier {

@@ -1,22 +1,47 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
 
+import '../services/ad_remote_config_service.dart';
+import '../services/game_state_service.dart';
 import '../services/smart_ad_manager.dart';
+import 'google_test_ad.dart';
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
 class _D {
-  static const card     = Color(0xFFFFFFFF);
-  static const cardBord = Color(0xFFE2E8F0);
-  static const gold     = Color(0xFFF59E0B);
-  static const textMid  = Color(0xFF6B7280);
-  static const textLow  = Color(0xFF9CA3AF);
+  static const surface = Color(0xFF18181C);
+  static const gold = Color(0xFF9945FF);
+  static const goldText = Color(0xFFE9D5FF);
+  static const goldBg = Color(0xFF1A1228);
+  static const goldBdr = Color(0x669945FF);
+  static const textHi = Color(0xFFF4F4F5);
+  static const textMid = Color(0xFFA1A1AA);
+  static const textLow = Color(0xFF71717A);
+  static const line = Color(0x1FFFFFFF);
 }
 
-/// Native ad block only (no banner fallback). Requires platform native ad factory.
+TextStyle _sg({
+  double size = 13,
+  FontWeight weight = FontWeight.w500,
+  Color color = _D.textHi,
+  double? spacing,
+}) =>
+    GoogleFonts.spaceGrotesk(
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+      letterSpacing: spacing,
+      height: 1.1,
+    );
+
 class MinimizableNativeAd extends StatefulWidget {
   final String title;
-  const MinimizableNativeAd({super.key, this.title = 'Sponsored'});
+  final bool bannerFallback;
+  const MinimizableNativeAd({
+    super.key,
+    this.title = 'Sponsored',
+    this.bannerFallback = true,
+  });
 
   @override
   State<MinimizableNativeAd> createState() => _MinimizableNativeAdState();
@@ -25,29 +50,48 @@ class MinimizableNativeAd extends StatefulWidget {
 class _MinimizableNativeAdState extends State<MinimizableNativeAd>
     with SingleTickerProviderStateMixin {
   bool _minimized = false;
-  bool _loading   = true;
+  bool _loading = true;
+  bool _loadStarted = false;
   NativeAd? _nativeAd;
 
-  late final AnimationController _expandCtrl = AnimationController(
+  late final AnimationController _expand = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 260),
-    value: 1.0, // starts expanded
-  );
-  late final Animation<double> _expandAnim = CurvedAnimation(
-    parent: _expandCtrl,
-    curve: Curves.easeInOutCubic,
+    value: 1,
   );
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_loadStarted) return;
+    if (!TickerMode.of(context)) return;
+    _loadStarted = true;
+    _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({int attempt = 0}) async {
+    final cfg = context.read<AdRemoteConfigService>();
+    final game = context.read<GameStateService>();
+    if (game.isPremiumActive || !cfg.nativeEnabled) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
     final manager = context.read<SmartAdManager>();
-    final native  = await manager.loadNative(factoryId: 'adFactoryMedium');
-    if (!mounted) { native?.dispose(); return; }
+    final native = await manager.takeNative(factoryId: SmartAdManager.nativeFactoryId);
+    if (!mounted) {
+      native?.dispose();
+      return;
+    }
+    if (native == null && attempt < 1) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      if (!TickerMode.of(context)) {
+        _loadStarted = false;
+        return;
+      }
+      await _load(attempt: attempt + 1);
+      return;
+    }
     setState(() {
       _nativeAd = native;
       _loading = false;
@@ -56,118 +100,105 @@ class _MinimizableNativeAdState extends State<MinimizableNativeAd>
 
   @override
   void dispose() {
-    _expandCtrl.dispose();
+    _expand.dispose();
     _nativeAd?.dispose();
     super.dispose();
   }
 
   void _toggle() {
     setState(() => _minimized = !_minimized);
-    if (_minimized) {
-      _expandCtrl.reverse();
-    } else {
-      _expandCtrl.forward();
-    }
+    _minimized ? _expand.reverse() : _expand.forward();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Only show when we have a native ad (no banner fallback)
-    if (!_loading && _nativeAd == null) {
-      return const SizedBox.shrink();
+    final premium = context.watch<GameStateService>().isPremiumActive;
+    final cfg = context.watch<AdRemoteConfigService>();
+    if (premium || !cfg.shouldShowSdkAds) return const SizedBox.shrink();
+    if (_nativeAd == null) {
+      if (widget.bannerFallback) {
+        return const Center(child: GoogleTestBanner(large: true));
+      }
+      if (!_loading) return const SizedBox.shrink();
     }
 
     return Container(
       decoration: BoxDecoration(
-        color: _D.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _D.cardBord),
+        color: const Color(0xFF18181C),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: _D.line, width: 0.8),
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Header bar ─────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(children: [
-              // Ad badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: _D.textLow.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: const Text(
-                  'AD',
-                  style: TextStyle(
-                    color: _D.textLow,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                widget.title,
-                style: const TextStyle(
-                  color: _D.textMid,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const Spacer(),
-              // Minimize toggle
-              GestureDetector(
-                onTap: _loading ? null : _toggle,
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: _D.cardBord,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: AnimatedRotation(
-                    turns: _minimized ? 0.5 : 0.0,
-                    duration: const Duration(milliseconds: 260),
-                    curve: Curves.easeInOutCubic,
-                    child: const Icon(
-                      Icons.keyboard_arrow_up_rounded,
-                      color: _D.textMid,
-                      size: 16,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _D.goldBg,
+                        borderRadius: BorderRadius.circular(99),
+                        border: Border.all(color: _D.goldBdr),
+                      ),
+                      child: Text('AD', style: _sg(size: 9, weight: FontWeight.w800, color: _D.goldText, spacing: 0.8)),
                     ),
-                  ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: _sg(size: 13, weight: FontWeight.w600, color: _D.textMid),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: _loading ? null : _toggle,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 160),
+                        opacity: _loading ? 0.4 : 1,
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(11),
+                            border: Border.all(color: _D.line),
+                          ),
+                          child: AnimatedRotation(
+                            turns: _minimized ? 0.5 : 0,
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                            child: const Icon(Icons.keyboard_arrow_up_rounded, color: _D.textHi, size: 18),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ]),
+              Container(height: 0.8, color: _D.line),
+              if (_loading)
+                const _LoadingPlaceholder()
+              else if (!_minimized)
+                SizedBox(
+                  width: double.infinity,
+                  height: 320,
+                  child: Material(
+                    color: _D.surface,
+                    child: AdWidget(key: ObjectKey(_nativeAd), ad: _nativeAd!),
+                  ),
+                ),
+            ],
           ),
-
-          // ── Divider ────────────────────────────────────────────────────────
-          Container(height: 1, color: _D.cardBord),
-
-          // ── Native ad body only (animated collapse) ───────────────────────
-          SizeTransition(
-            sizeFactor: _expandAnim,
-            axisAlignment: -1,
-            child: _loading
-                ? _LoadingPlaceholder()
-                : _nativeAd != null
-                    ? SizedBox(
-                        width: double.infinity,
-                        height: 250,
-                        child: AdWidget(ad: _nativeAd!),
-                      )
-                    : const SizedBox.shrink(),
-          ),
-        ],
-      ),
     );
   }
 }
 
-// ─── Loading placeholder ──────────────────────────────────────────────────────
 class _LoadingPlaceholder extends StatefulWidget {
+  const _LoadingPlaceholder();
+
   @override
   State<_LoadingPlaceholder> createState() => _LoadingPlaceholderState();
 }
@@ -176,40 +207,39 @@ class _LoadingPlaceholderState extends State<_LoadingPlaceholder>
     with SingleTickerProviderStateMixin {
   late final AnimationController _shimmer = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1200),
+    duration: const Duration(milliseconds: 1100),
   )..repeat(reverse: true);
 
   @override
-  void dispose() { _shimmer.dispose(); super.dispose(); }
+  void dispose() {
+    _shimmer.dispose();
+    super.dispose();
+  }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _shimmer,
-    builder: (_, __) => Container(
-      width: double.infinity,
-      height: 72,
-      color: Color.lerp(
-        _D.card,
-        _D.cardBord,
-        _shimmer.value * 0.5,
-      ),
-      child: Center(
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              color: _D.textLow.withValues(alpha: 0.5 + 0.5 * _shimmer.value),
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _shimmer,
+      builder: (_, __) => Container(
+        width: double.infinity,
+        height: 78,
+        color: Color.lerp(_D.surface, const Color(0xFF222228), _shimmer.value * 0.45),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 15,
+              height: 15,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.6,
+                color: _D.gold.withValues(alpha: 0.45 + _shimmer.value * 0.4),
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          const Text(
-            'Loading…',
-            style: TextStyle(color: _D.textLow, fontSize: 11),
-          ),
-        ]),
+            const SizedBox(width: 9),
+            Text('Loading offer', style: _sg(size: 12, color: _D.textLow)),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

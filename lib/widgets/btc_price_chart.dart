@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,36 +8,60 @@ import 'package:provider/provider.dart';
 import '../models/coin.dart';
 import '../services/btc_price_service.dart';
 
-// ─── Design tokens (matches dashboard_screen.dart) ────────────────────────────
-class _D {
-  static const white      = Color(0xFFFFFFFF);
-  static const bg         = Color(0xFFF7F8FA);
-  static const border     = Color(0x12000000);
-  static const borderSm   = Color(0x0D000000);
-
-  static const amber      = Color(0xFFF59E0B);
-  static const amberBg    = Color(0xFFFFFBEB);
-  static const amberDeep  = Color(0xFF92400E);
-
-  static const green      = Color(0xFF10B981);
-  static const greenBg    = Color(0xFFF0FDF6);
-  static const greenDeep  = Color(0xFF065F46);
-
-  static const red        = Color(0xFFEF4444);
-  static const redBg      = Color(0xFFFEF2F2);
-  static const redDeep    = Color(0xFF991B1B);
-
-  static const text       = Color(0xFF0D0F12);
-  static const sub        = Color(0xFF6B7280);
-  static const hint       = Color(0xFFB0B7C3);
-
-  static const r14 = BorderRadius.all(Radius.circular(14));
-  static const r10 = BorderRadius.all(Radius.circular(10));
-  static const r8  = BorderRadius.all(Radius.circular(8));
+class _NoBlur extends StatelessWidget {
+  const _NoBlur({required this.filter, required this.child, this.blendMode});
+  final ImageFilter filter;
+  final Widget child;
+  final BlendMode? blendMode;
+  @override
+  Widget build(BuildContext context) => child;
 }
 
-/// Shows price chart for one or more coins. When [coinIds] is set, fetches and shows
-/// charts for those coins with a selector. When null, shows BTC only (legacy).
+class _D {
+  static const bg = Color(0xFF08080A);
+  static const surface = Color(0xFF18181C);
+  static const amber = Color(0xFF9945FF);
+  static const amberText = Color(0xFFE9D5FF);
+  static const amberBg = Color(0xFF1A1228);
+  static const amberBdr = Color(0x669945FF);
+  static const green = Color(0xFF14F195);
+  static const greenText = Color(0xFFBBF7D0);
+  static const greenBg = Color(0xFF0A2E22);
+  static const red = Color(0xFFF43F5E);
+  static const redText = Color(0xFFFECDD3);
+  static const redBg = Color(0xFF3F1219);
+  static const text = Color(0xFFF4F4F5);
+  static const sub = Color(0xFFA1A1AA);
+  static const hint = Color(0xFF71717A);
+  static const line = Color(0x1FFFFFFF);
+}
+
+TextStyle _sg({
+  double size = 13,
+  FontWeight weight = FontWeight.w500,
+  Color color = _D.text,
+  double? spacing,
+}) =>
+    GoogleFonts.spaceGrotesk(
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+      letterSpacing: spacing,
+      height: 1.1,
+    );
+
+TextStyle _mono({
+  double size = 12,
+  FontWeight weight = FontWeight.w600,
+  Color color = _D.text,
+}) =>
+    GoogleFonts.jetBrainsMono(
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+      height: 1.1,
+    );
+
 class BtcPriceChart extends StatefulWidget {
   final List<String>? coinIds;
   const BtcPriceChart({super.key, this.coinIds});
@@ -51,12 +77,12 @@ class _BtcPriceChartState extends State<BtcPriceChart> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final svc = context.read<BtcPriceService>();
+      final service = context.read<BtcPriceService>();
       if (widget.coinIds != null && widget.coinIds!.isNotEmpty) {
         _selectedCoinId = widget.coinIds!.first;
-        svc.fetchForCoins(widget.coinIds!);
+        service.fetchForCoins(widget.coinIds!);
       } else {
-        svc.fetchAll();
+        service.fetchAll();
       }
     });
   }
@@ -64,46 +90,38 @@ class _BtcPriceChartState extends State<BtcPriceChart> {
   @override
   void didUpdateWidget(BtcPriceChart oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.coinIds != null && widget.coinIds!.isNotEmpty) {
-      if (!widget.coinIds!.contains(_selectedCoinId)) {
-        _selectedCoinId = widget.coinIds!.first;
-      }
+    if (widget.coinIds != null && widget.coinIds!.isNotEmpty && !widget.coinIds!.contains(_selectedCoinId)) {
+      _selectedCoinId = widget.coinIds!.first;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final coinIds = widget.coinIds;
-    if (coinIds != null && coinIds.isNotEmpty) {
+    final ids = widget.coinIds;
+    if (ids != null && ids.isNotEmpty) {
       return _MultiCoinChart(
-        coinIds: coinIds,
-        selectedCoinId: _selectedCoinId ?? coinIds.first,
+        coinIds: ids,
+        selectedCoinId: _selectedCoinId ?? ids.first,
         onSelectCoin: (id) => setState(() => _selectedCoinId = id),
       );
     }
-    return const _SingleCoinChart(coinId: 'btc');
+    return const _SingleCoinChart(coinId: 'sol');
   }
 }
 
-// ─── Single coin chart ────────────────────────────────────────────────────────
 class _SingleCoinChart extends StatelessWidget {
   final String coinId;
   const _SingleCoinChart({required this.coinId});
 
   @override
   Widget build(BuildContext context) {
-    final svc     = context.watch<BtcPriceService>();
-    final data    = coinId == 'btc' ? svc.chartData : svc.getChartData(coinId);
-    final price   = svc.getPrice(coinId);
-    final loading = svc.loading;
-    final error   = svc.error;
-    final coin    = Coins.byId(coinId);
-    final label   = coin != null
-        ? '${coin.symbol} / USD'
-        : '${coinId.toUpperCase()} / USD';
+    final service = context.watch<BtcPriceService>();
+    final data = coinId == 'btc' ? service.chartData : service.getChartData(coinId);
+    final price = service.getPrice(coinId);
+    final coin = Coins.byId(coinId);
+    final label = coin != null ? '${coin.symbol} / USD' : '${coinId.toUpperCase()} / USD';
 
-    // Loading state
-    if (loading && data.isEmpty) {
+    if (service.loading && data.isEmpty) {
       return _ChartShell(
         label: label,
         price: null,
@@ -113,13 +131,12 @@ class _SingleCoinChart extends StatelessWidget {
           child: SizedBox(
             width: 18,
             height: 18,
-            child: CircularProgressIndicator(strokeWidth: 1.5, color: _D.amber),
+            child: CircularProgressIndicator(strokeWidth: 1.6, color: _D.amber),
           ),
         ),
       );
     }
 
-    // Empty / error state
     if (data.isEmpty) {
       return _ChartShell(
         label: label,
@@ -127,37 +144,29 @@ class _SingleCoinChart extends StatelessWidget {
         change: null,
         isUp: true,
         child: Center(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(
-              Icons.signal_wifi_statusbar_connected_no_internet_4_rounded,
-              color: _D.hint,
-              size: 22,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              error != null ? 'Chart unavailable' : 'No data',
-              style: GoogleFonts.dmSans(color: _D.hint, fontSize: 12),
-            ),
-          ]),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.wifi_off_rounded, color: _D.hint, size: 20),
+              const SizedBox(height: 6),
+              Text(service.error != null ? 'Chart unavailable' : 'No data', style: _sg(size: 12, color: _D.hint)),
+            ],
+          ),
         ),
       );
     }
 
-    final prices     = data.map((e) => e.price).toList();
-    final minY       = prices.reduce((a, b) => a < b ? a : b);
-    final maxY       = prices.reduce((a, b) => a > b ? a : b);
-    final range      = (maxY - minY).clamp(1.0, double.infinity);
-    final pad        = range * 0.12;
-    final spots      = data.asMap().entries
-        .map((e) => FlSpot(e.key.toDouble(), e.value.price))
-        .toList();
-    final firstPrice = prices.first;
-    final lastPrice  = prices.last;
-    final change     = firstPrice > 0
-        ? ((lastPrice - firstPrice) / firstPrice) * 100
-        : 0.0;
-    final isUp       = change >= 0;
-    final lineColor  = isUp ? _D.green : _D.red;
+    final prices = data.map((point) => point.price).toList();
+    final minY = prices.reduce((a, b) => a < b ? a : b);
+    final maxY = prices.reduce((a, b) => a > b ? a : b);
+    final range = (maxY - minY).clamp(1.0, double.infinity);
+    final pad = range * 0.12;
+    final spots = data.asMap().entries.map((entry) => FlSpot(entry.key.toDouble(), entry.value.price)).toList();
+    final first = prices.first;
+    final last = prices.last;
+    final change = first > 0 ? ((last - first) / first) * 100 : 0.0;
+    final isUp = change >= 0;
+    final lineColor = isUp ? _D.green : _D.red;
 
     return _ChartShell(
       label: label,
@@ -166,88 +175,80 @@ class _SingleCoinChart extends StatelessWidget {
       isUp: isUp,
       child: LineChart(
         LineChartData(
-            minX: 0,
-            maxX: (data.length - 1).toDouble(),
-            minY: minY - pad,
-            maxY: maxY + pad,
-            gridData: FlGridData(
-              show: true,
-              drawVerticalLine: false,
-              horizontalInterval: range / 4,
-              getDrawingHorizontalLine: (_) => const FlLine(
-                color: Color(0x0A000000),
-                strokeWidth: 1,
-                dashArray: [4, 6],
-              ),
+          minX: 0,
+          maxX: (data.length - 1).toDouble(),
+          minY: minY - pad,
+          maxY: maxY + pad,
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: range / 4,
+            getDrawingHorizontalLine: (_) => FlLine(
+              color: Colors.white.withValues(alpha: 0.055),
+              strokeWidth: 1,
+              dashArray: [4, 6],
             ),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 52,
-                  interval: range / 4,
-                  getTitlesWidget: (value, _) => Text(
-                    '\$${_shortPrice(value)}',
-                    style: GoogleFonts.dmMono(color: _D.hint, fontSize: 9),
-                  ),
-                ),
-              ),
-              rightTitles:  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles:    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            ),
-            borderData: FlBorderData(show: false),
-            lineTouchData: LineTouchData(
-              touchTooltipData: LineTouchTooltipData(
-                getTooltipColor: (_) => _D.white,
-                tooltipBorder: const BorderSide(color: _D.border, width: 0.5),
-                tooltipRoundedRadius: 8,
-                getTooltipItems: (spots) => spots.map((s) => LineTooltipItem(
-                  '\$${s.y.toStringAsFixed(0)}',
-                  GoogleFonts.dmMono(
-                    color: _D.amberDeep,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                )).toList(),
-              ),
-              handleBuiltInTouches: true,
-            ),
-            lineBarsData: [
-              LineChartBarData(
-                spots: spots,
-                isCurved: true,
-                curveSmoothness: 0.35,
-                color: lineColor,
-                barWidth: 1.5,
-                isStrokeCapRound: true,
-                dotData: const FlDotData(show: false),
-                belowBarData: BarAreaData(
-                  show: true,
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      lineColor.withValues(alpha: 0.10),
-                      lineColor.withValues(alpha: 0.0),
-                    ],
-                  ),
-                ),
-              ),
-            ],
           ),
-          duration: const Duration(milliseconds: 300),
+          titlesData: FlTitlesData(
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 48,
+                interval: range / 4,
+                getTitlesWidget: (value, _) => Text(_shortPrice(value), style: _mono(size: 9, color: _D.hint)),
+              ),
+            ),
+            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          ),
+          borderData: FlBorderData(show: false),
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipColor: (_) => const Color(0xF0111114),
+              tooltipBorder: const BorderSide(color: _D.line),
+              tooltipRoundedRadius: 12,
+              getTooltipItems: (touched) => touched
+                  .map(
+                    (spot) => LineTooltipItem(
+                  '\$${spot.y.toStringAsFixed(0)}',
+                  _mono(size: 12, weight: FontWeight.w700, color: _D.amberText),
+                ),
+              )
+                  .toList(),
+            ),
+          ),
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              curveSmoothness: 0.35,
+              color: lineColor,
+              barWidth: 2,
+              isStrokeCapRound: true,
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [lineColor.withValues(alpha: 0.18), lineColor.withValues(alpha: 0)],
+                ),
+              ),
+            ),
+          ],
         ),
+        duration: const Duration(milliseconds: 300),
+      ),
     );
   }
 
-  static String _shortPrice(double v) {
-    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
-    return v.toStringAsFixed(0);
+  static String _shortPrice(double value) {
+    if (value >= 1000) return '\$${(value / 1000).toStringAsFixed(1)}k';
+    return '\$${value.toStringAsFixed(0)}';
   }
 }
 
-// ─── Multi-coin selector + chart ─────────────────────────────────────────────
 class _MultiCoinChart extends StatelessWidget {
   final List<String> coinIds;
   final String selectedCoinId;
@@ -260,54 +261,60 @@ class _MultiCoinChart extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      if (coinIds.length > 1) ...[
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: coinIds.map((id) {
-              final coin       = Coins.byId(id);
-              final isSelected = id == selectedCoinId;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () => onSelectCoin(id),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: isSelected ? _D.amberBg : _D.bg,
-                      borderRadius: _D.r8,
-                      border: Border.all(
-                        color: isSelected
-                            ? _D.amber.withOpacity(0.3)
-                            : _D.border,
-                        width: 0.5,
-                      ),
-                    ),
-                    child: Text(
-                      coin?.symbol ?? id.toUpperCase(),
-                      style: GoogleFonts.dmSans(
-                        color: isSelected ? _D.amberDeep : _D.sub,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (coinIds.length > 1) ...[
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final id in coinIds)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _CoinChip(
+                      label: Coins.byId(id)?.symbol ?? id.toUpperCase(),
+                      selected: id == selectedCoinId,
+                      onTap: () => onSelectCoin(id),
                     ),
                   ),
-                ),
-              );
-            }).toList(),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
+          const SizedBox(height: 12),
+        ],
+        _SingleCoinChart(coinId: selectedCoinId),
       ],
-      _SingleCoinChart(coinId: selectedCoinId),
-    ],
-  );
+    );
+  }
 }
 
-// ─── Chart shell (card wrapper + header + footer) ─────────────────────────────
+class _CoinChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CoinChip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? _D.amberBg : Colors.white.withValues(alpha: 0.045),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: selected ? _D.amberBdr : _D.line),
+        ),
+        child: Text(label, style: _sg(size: 12, weight: FontWeight.w700, color: selected ? _D.amberText : _D.sub)),
+      ),
+    );
+  }
+}
+
 class _ChartShell extends StatelessWidget {
   final String label;
   final double? price;
@@ -316,7 +323,7 @@ class _ChartShell extends StatelessWidget {
   final Widget child;
 
   const _ChartShell({
-    this.label = 'BTC / USD',
+    required this.label,
     required this.price,
     required this.change,
     required this.isUp,
@@ -325,161 +332,113 @@ class _ChartShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final changeColor  = isUp ? _D.green    : _D.red;
-    final changeBg     = isUp ? _D.greenBg  : _D.redBg;
-    final changeText   = isUp ? _D.greenDeep : _D.redDeep;
-    final changeIcon   = isUp
-        ? Icons.arrow_drop_up_rounded
-        : Icons.arrow_drop_down_rounded;
+    final changeColor = isUp ? _D.green : _D.red;
+    final changeText = isUp ? _D.greenText : _D.redText;
+    final changeBg = isUp ? _D.greenBg : _D.redBg;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: _D.white,
-        borderRadius: _D.r14,
-        border: Border.all(color: _D.border, width: 0.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: _NoBlur(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 15, 16, 13),
+          decoration: BoxDecoration(
+            color: const Color(0xB318181C),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: _D.line, width: 0.8),
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            const headerHeight = 28.0;
-            const footerHeight = 18.0;
-            const gapAbove = 12.0;
-            const gapBelow = 10.0;
-            const paddingVertical = 30.0;
-            final maxChartHeight = constraints.maxHeight.isFinite
-                ? (constraints.maxHeight - paddingVertical - headerHeight - footerHeight - gapAbove - gapBelow).clamp(60.0, 140.0)
-                : 140.0;
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final bounded = constraints.maxHeight.isFinite;
+              final chart = ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: bounded
+                    ? child
+                    : SizedBox(height: 148, width: double.infinity, child: child),
+              );
 
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Header (flexible to avoid overflow) ───────────────────────
-                Row(
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: _D.amberBg,
-                        borderRadius: _D.r8,
-                        border: Border.all(color: _D.amber.withValues(alpha: 0.3), width: 0.5),
-                      ),
-                      child: const Icon(Icons.show_chart_rounded, color: _D.amber, size: 15),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        label,
-                        style: GoogleFonts.dmSans(
-                          color: _D.sub,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.4,
+              return Column(
+                mainAxisSize: bounded ? MainAxisSize.max : MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: _D.amberBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: _D.amberBdr),
                         ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
+                        child: const Icon(Icons.show_chart_rounded, color: _D.amber, size: 16),
                       ),
-                    ),
-                    if (price != null)
-                      Flexible(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerRight,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.attach_money, size: 16, color: _D.text),
-                              Text(
-                                price!.toStringAsFixed(0),
-                                style: GoogleFonts.dmMono(
-                                  color: _D.text,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                'USD',
-                                style: GoogleFonts.dmSans(
-                                  color: _D.sub,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 9,
-                                ),
-                              ),
-                              if (change != null) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: changeBg,
-                                    borderRadius: _D.r8,
-                                    border: Border.all(
-                                      color: changeColor.withOpacity(0.2),
-                                      width: 0.5,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: _sg(size: 11, weight: FontWeight.w700, color: _D.sub, spacing: 0.4),
+                        ),
+                      ),
+                      if (price != null) ...[
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('\$${price!.toStringAsFixed(0)}', style: _mono(size: 16, weight: FontWeight.w700)),
+                                if (change != null) ...[
+                                  const SizedBox(width: 7),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: changeBg,
+                                      borderRadius: BorderRadius.circular(99),
+                                      border: Border.all(color: changeColor.withValues(alpha: 0.28)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          isUp ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded,
+                                          color: changeColor,
+                                          size: 15,
+                                        ),
+                                        Text(
+                                          '${change!.abs().toStringAsFixed(2)}%',
+                                          style: _sg(size: 10, weight: FontWeight.w700, color: changeText),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(changeIcon, color: changeColor, size: 12),
-                                      Text(
-                                        '${change!.abs().toStringAsFixed(2)}%',
-                                        style: GoogleFonts.dmSans(
-                                          color: changeText,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-
-                // ── Chart body (height adapts to avoid overflow) ─────────────
-                ClipRRect(
-                  borderRadius: _D.r8,
-                  child: SizedBox(height: maxChartHeight, child: child),
-                ),
-
-                const SizedBox(height: 10),
-
-                // ── Footer ───────────────────────────────────────────────────
-                Row(
-                  children: [
-                    Icon(Icons.access_time_rounded, color: _D.hint, size: 12),
-                    const SizedBox(width: 5),
-                    Text(
-                      'Last 30 days',
-                      style: GoogleFonts.dmSans(color: _D.hint, fontSize: 10),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'CoinGecko',
-                      style: GoogleFonts.dmSans(color: _D.hint, fontSize: 10),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          },
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (bounded) Expanded(child: chart) else chart,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.schedule_rounded, color: _D.hint, size: 12),
+                      const SizedBox(width: 5),
+                      Text('Last 30 days', style: _sg(size: 10, color: _D.hint)),
+                      const Spacer(),
+                      Text('COINGECKO', style: _sg(size: 9, weight: FontWeight.w700, color: _D.hint, spacing: 0.8)),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

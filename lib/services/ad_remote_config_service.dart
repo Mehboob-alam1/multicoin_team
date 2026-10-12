@@ -3,10 +3,18 @@ import 'package:flutter/material.dart' show Color;
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
 
-/// Remote Config: one boolean to enable/disable all ads, one URL for custom tab.
-/// Ad unit IDs come from Remote Config (same keys as in your Firebase template).
+/// Remote Config ads (Android):
+/// - `ads_enabled` master switch for every ad
+/// - `ads_interstitial_enabled`, `ads_app_open_enabled`, `ads_native_enabled`,
+///   `ads_banner_enabled`, `ads_rewarded_enabled` per slot
+/// Ad unit IDs also come from Remote Config.
 class AdRemoteConfigService extends ChangeNotifier {
   static const _adsEnabled = 'ads_enabled';
+  static const _interstitialEnabled = 'ads_interstitial_enabled';
+  static const _appOpenEnabled = 'ads_app_open_enabled';
+  static const _nativeEnabled = 'ads_native_enabled';
+  static const _bannerEnabled = 'ads_banner_enabled';
+  static const _rewardedEnabled = 'ads_rewarded_enabled';
   static const _useCustomTab = 'use_custom_tab';
   static const _customTabUrl = 'custom_tab_url';
   static const _interstitialAdUnit = 'interstitial_ad_unit';
@@ -30,30 +38,57 @@ class AdRemoteConfigService extends ChangeNotifier {
 
   bool get isLoaded => _loaded;
 
-  /// Single boolean: when false, no ads and no custom tab.
-  bool get adsEnabled => _getBool(_adsEnabled);
+  /// Master switch. Defaults ON. Firebase BOOLEAN keys are created as `false`,
+  /// which used to turn every ad off after fetch — that is treated as
+  /// "uninitialized" unless a slot is explicitly true or units were customized.
+  bool get adsEnabled {
+    final master = _getBool(_adsEnabled);
+    if (master) return true;
+    if (_uninitializedAdFlags) return true;
+    return false;
+  }
+
+  bool get interstitialEnabled =>
+      adsEnabled && (_uninitializedAdFlags || _getBool(_interstitialEnabled));
+  bool get appOpenEnabled =>
+      adsEnabled && (_uninitializedAdFlags || _getBool(_appOpenEnabled));
+  bool get nativeEnabled =>
+      adsEnabled && (_uninitializedAdFlags || _getBool(_nativeEnabled));
+  bool get bannerEnabled =>
+      adsEnabled && (_uninitializedAdFlags || _getBool(_bannerEnabled));
+  bool get rewardedEnabled =>
+      adsEnabled && (_uninitializedAdFlags || _getBool(_rewardedEnabled));
+
+  bool get _uninitializedAdFlags {
+    final anySlotOn = _getBool(_interstitialEnabled) ||
+        _getBool(_appOpenEnabled) ||
+        _getBool(_nativeEnabled) ||
+        _getBool(_bannerEnabled) ||
+        _getBool(_rewardedEnabled);
+    if (anySlotOn) return false;
+    return bannerAdmobId == 'ca-app-pub-3940256099942544/6300978111';
+  }
   /// When true, open [customTabUrl] in Chrome Custom Tabs instead of showing any ad.
   bool get useCustomTab => _getBool(_useCustomTab);
   /// URL used when [useCustomTab] is true.
   String get customTabUrl => _getString(_customTabUrl);
 
   bool _getBool(String key) {
+    final def = defaultParameters[key];
+    final fallback = def is bool ? def : def == 'true' || key != _useCustomTab;
     try {
-      if (!_loaded) {
-        final def = defaultParameters[key];
-        if (def is bool) return def;
-        return key == _adsEnabled;
+      if (!_loaded) return fallback;
+      final value = _remoteConfig.getValue(key);
+      final s = value.asString().trim().toLowerCase();
+      if (s == 'true' || s == '1' || s == 'yes' || s == 'on') return true;
+      if (s == 'false' || s == '0' || s == 'no' || s == 'off') {
+        if (value.source == ValueSource.valueRemote) return false;
+        return fallback;
       }
-      try {
-        if (_remoteConfig.getBool(key)) return true;
-      } catch (_) {}
-      final s = (_remoteConfig.getString(key) ?? '').toLowerCase();
-      if (s == 'true' || s == '1' || s == 'yes') return true;
-      return false;
+      if (s.isEmpty) return fallback;
+      return fallback;
     } catch (_) {
-      final def = defaultParameters[key];
-      if (def is bool) return def;
-      return key == _adsEnabled;
+      return fallback;
     }
   }
 
@@ -108,8 +143,13 @@ class AdRemoteConfigService extends ChangeNotifier {
 
   static Map<String, Object> get defaultParameters => {
         _adsEnabled: true,
-        _useCustomTab: true,
-        _customTabUrl: 'https://example.com',
+        _interstitialEnabled: true,
+        _appOpenEnabled: true,
+        _nativeEnabled: true,
+        _bannerEnabled: true,
+        _rewardedEnabled: true,
+        _useCustomTab: false,
+        _customTabUrl: '',
         _interstitialAdUnit: 'ca-app-pub-3940256099942544/1033173712',
         _interstitialAdmanagerUnit: 'ca-app-pub-3940256099942544/1033173712',
         _rewardedAdUnit: 'ca-app-pub-3940256099942544/5224354917',
@@ -139,6 +179,17 @@ class AdRemoteConfigService extends ChangeNotifier {
       debugPrint('AdRemoteConfigService load error: $e');
     }
     _loaded = true;
+    debugPrint(
+      'Ads RC raw enabled=${_getBool(_adsEnabled)} '
+      'inter=${_getBool(_interstitialEnabled)} open=${_getBool(_appOpenEnabled)} '
+      'native=${_getBool(_nativeEnabled)} banner=${_getBool(_bannerEnabled)} '
+      'rewarded=${_getBool(_rewardedEnabled)} uninitialized=$_uninitializedAdFlags',
+    );
+    debugPrint(
+      'Ads RC using adsEnabled=$adsEnabled interstitial=$interstitialEnabled '
+      'appOpen=$appOpenEnabled native=$nativeEnabled banner=$bannerEnabled '
+      'rewarded=$rewardedEnabled bannerId=$bannerAdmobId',
+    );
     notifyListeners();
   }
 
@@ -167,8 +218,17 @@ class AdRemoteConfigService extends ChangeNotifier {
   }
 
   /// Whether to show anything (ad or custom tab) for any slot.
-  bool get adsActive => adsEnabled && (useCustomTab ? customTabUrl.isNotEmpty : true);
+  bool get adsActive => adsEnabled && (canShowWebsiteRedirect || shouldShowSdkAds);
 
-  /// True when website redirect is enabled and URL is set (so we can show "Open website").
-  bool get canShowWebsiteRedirect => useCustomTab && customTabUrl.isNotEmpty;
+  /// True when website redirect is enabled and URL is a real destination.
+  bool get canShowWebsiteRedirect {
+    if (!useCustomTab) return false;
+    final url = customTabUrl.trim();
+    if (url.isEmpty) return false;
+    final host = Uri.tryParse(url)?.host.toLowerCase() ?? '';
+    return host.isNotEmpty && host != 'example.com' && host != 'www.example.com';
+  }
+
+  /// True when the master switch is on. Per-slot flags still apply.
+  bool get shouldShowSdkAds => adsEnabled;
 }

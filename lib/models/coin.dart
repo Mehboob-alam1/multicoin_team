@@ -68,9 +68,9 @@ class Coins {
     id: 'sol',
     name: 'Solana',
     symbol: 'SOL',
-    difficulty: 0.4,
+    difficulty: 1.0,
     baseMiningRate: 0.002,
-    marketPrice: 220,
+    marketPrice: 200,
     volatilityFactor: 0.15,
   );
   static const ltc = Coin(
@@ -92,7 +92,7 @@ class Coins {
     volatilityFactor: 0.2,
   );
 
-  static const List<Coin> all = [btc, eth, sol, ltc, doge];
+  static const List<Coin> all = [sol, btc, eth, ltc, doge];
 
   static Coin? byId(String id) {
     try {
@@ -103,5 +103,5 @@ class Coins {
   }
 
   /// Primary currency used for rig purchases and legacy balance display.
-  static const String primaryId = 'btc';
+  static const String primaryId = 'sol';
 }

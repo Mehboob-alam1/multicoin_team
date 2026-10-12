@@ -31,7 +31,7 @@ class ScrollPage extends StatelessWidget {
       child: child,
     );
     final scroll = CustomScrollView(
-      physics: physics ?? const BouncingScrollPhysics(),
+      physics: physics ?? AppTheme.pageScroll,
       slivers: [
         SliverToBoxAdapter(child: content),
       ],
@@ -65,7 +65,7 @@ class ScrollPageSingle extends StatelessWidget {
       left: true,
       right: true,
       child: SingleChildScrollView(
-        physics: physics ?? const BouncingScrollPhysics(),
+        physics: physics ?? AppTheme.pageScroll,
         padding: EdgeInsets.fromLTRB(
           AppTheme.pagePaddingH,
           AppTheme.pagePaddingV,

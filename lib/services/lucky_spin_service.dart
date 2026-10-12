@@ -44,10 +44,10 @@ class LuckySpinService extends ChangeNotifier {
 
     final roll = _random.nextInt(100);
     if (roll < 35) {
-      return const SpinResult(type: 'btc_small', label: 'BTC bonus', btc: 0.00003);
+      return const SpinResult(type: 'btc_small', label: 'SOL bonus', btc: 0.00003);
     }
     if (roll < 60) {
-      return const SpinResult(type: 'btc_big', label: 'Big BTC bonus', btc: 0.00012);
+      return const SpinResult(type: 'btc_big', label: 'Big SOL bonus', btc: 0.00012);
     }
     if (roll < 78) {
       return const SpinResult(type: 'boost', label: 'Mining boost', boost: Duration(minutes: 20));

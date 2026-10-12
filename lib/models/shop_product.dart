@@ -53,7 +53,7 @@ class ShopProducts {
     OneTimeProduct(
       id: 'starter_pack',
       name: 'Starter Pack',
-      description: 'Small BTC + 1 GPU rig',
+      description: 'Small SOL + 1 GPU rig',
       price: '\$1.99',
       btcAmount: 0.00005,
       rigId: 'gpu_rig',
@@ -61,11 +61,18 @@ class ShopProducts {
     ),
     OneTimeProduct(
       id: 'satoshi_pack',
-      name: 'Satoshi Pack',
+      name: 'Solana Pack',
       description: '~2 days mining worth',
       price: '\$4.99',
       btcAmount: 0.0002,
-      icon: '₿',
+      icon: '◎',
+    ),
+    OneTimeProduct(
+      id: 'withdraw_unlock',
+      name: 'Withdraw Unlock',
+      description: 'Unlock withdrawals after ads and \$100 balance.',
+      price: '\$4.99',
+      icon: '🔓',
     ),
     OneTimeProduct(
       id: 'boost_2x_1h',
@@ -77,7 +84,7 @@ class ShopProducts {
     OneTimeProduct(
       id: 'mega_pack',
       name: 'Mega Pack',
-      description: 'Larger BTC + Mining rack',
+      description: 'Larger SOL + Mining rack',
       price: '\$9.99',
       btcAmount: 0.0005,
       rigId: 'mining_rack',
@@ -135,7 +142,7 @@ class ShopProducts {
     OneTimeProduct(
       id: 'cpu_miner_rig',
       name: 'CPU Miner',
-      description: '1× CPU miner (multi-coin)',
+      description: '1× CPU miner for Solana',
       price: '\$0.99',
       rigId: 'cpu_miner',
       icon: '🧮',
@@ -143,7 +150,7 @@ class ShopProducts {
     OneTimeProduct(
       id: 'gaming_gpu_rig_iap',
       name: 'Gaming GPU Rig',
-      description: '1× Gaming GPU rig (multi-coin)',
+      description: '1× Gaming GPU rig for Solana',
       price: '\$2.99',
       rigId: 'gaming_gpu_rig',
       icon: '🎮',
@@ -151,15 +158,15 @@ class ShopProducts {
     OneTimeProduct(
       id: 'gpu_cluster_rig',
       name: 'GPU Mining Cluster',
-      description: '1× GPU mining cluster (multi-coin)',
+      description: '1× GPU mining cluster for Solana',
       price: '\$9.99',
       rigId: 'gpu_cluster',
       icon: '📊',
     ),
     OneTimeProduct(
       id: 'asic_btc_rig',
-      name: 'ASIC Bitcoin Miner',
-      description: '1× ASIC Bitcoin miner',
+      name: 'Solana Validator',
+      description: '1× Solana validator node',
       price: '\$19.99',
       rigId: 'asic_btc',
       icon: '⚡',
@@ -167,7 +174,7 @@ class ShopProducts {
     OneTimeProduct(
       id: 'data_center_rig_iap',
       name: 'Advanced Data Center Rig',
-      description: '1× Advanced data center rig (multi-coin)',
+      description: '1× Advanced data center rig for Solana',
       price: '\$49.99',
       rigId: 'data_center_rig',
       icon: '🏢',
@@ -183,7 +190,7 @@ class ShopProducts {
     OneTimeProduct(
       id: 'power_pack_30',
       name: 'Power Miner Pack',
-      description: 'Permanent +8% mining rate + 0.0003 BTC',
+      description: 'Permanent +8% mining rate + 0.15 SOL',
       price: '\$29.99',
       btcAmount: 0.0003,
       icon: '⚡',
@@ -191,7 +198,7 @@ class ShopProducts {
     OneTimeProduct(
       id: 'pro_upgrade_50',
       name: 'Pro Mining Upgrade',
-      description: 'Permanent +12% mining rate + 0.0008 BTC',
+      description: 'Permanent +12% mining rate + 0.40 SOL',
       price: '\$49.99',
       btcAmount: 0.0008,
       icon: '💎',
@@ -199,7 +206,7 @@ class ShopProducts {
     OneTimeProduct(
       id: 'elite_bundle_100',
       name: 'Elite Hash Bundle',
-      description: 'Permanent +18% mining rate + 0.002 BTC',
+      description: 'Permanent +18% mining rate + 1.00 SOL',
       price: '\$99.99',
       btcAmount: 0.002,
       icon: '🏆',
@@ -207,7 +214,7 @@ class ShopProducts {
     OneTimeProduct(
       id: 'tycoon_kit_150',
       name: 'Tycoon Mining Kit',
-      description: 'Permanent +22% mining rate + 0.004 BTC',
+      description: 'Permanent +22% mining rate + 2.00 SOL',
       price: '\$149.99',
       btcAmount: 0.004,
       icon: '👑',
@@ -215,7 +222,7 @@ class ShopProducts {
     OneTimeProduct(
       id: 'ultimate_pack_200',
       name: 'Ultimate Miner Pack',
-      description: 'Permanent +25% mining rate + 0.006 BTC',
+      description: 'Permanent +25% mining rate + 3.00 SOL',
       price: '\$199.00',
       btcAmount: 0.006,
       icon: '🌟',

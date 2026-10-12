@@ -1,23 +1,23 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/shop_product.dart';
 import '../theme/app_theme.dart';
+import '../theme/solana.dart';
+import '../widgets/solana_widgets.dart';
 import '../services/auth_service.dart';
 import '../services/game_state_service.dart';
 import '../services/iap_service.dart';
 
 class _D {
-  static const bg       = Color(0xFFF7F8FA);
-  static const card     = Color(0xFFFFFFFF);
-  static const cardBord = Color(0xFFE2E8F0);
-  static const gold     = Color(0xFFF59E0B);
-  static const goldDark = Color(0xFFD97706);
-  static const purple   = Color(0xFFA855F7);
-  static const textHi   = Color(0xFF0D0F12);
-  static const textMid  = Color(0xFF6B7280);
+  static const bg       = Solana.bg;
+  static const card     = Solana.surfaceRaised;
+  static const cardBord = Solana.border;
+  static const gold     = Solana.purple;
+  static const goldDark = Color(0xFF7A2FE0);
+  static const purple   = Solana.purple;
+  static const textHi   = Solana.textHi;
+  static const textMid  = Solana.textMid;
 }
 
 class PremiumOfferScreen extends StatefulWidget {
@@ -59,19 +59,10 @@ class _PremiumOfferScreenState extends State<PremiumOfferScreen> {
     final monthly = ShopProducts.premiumPlans.firstWhere((p) => p.id == 'premium_monthly');
 
     return Scaffold(
-      backgroundColor: _D.bg,
+      backgroundColor: Solana.bg,
       body: Stack(
         children: [
-          Positioned(
-            top: -100,
-            right: -40,
-            child: _Blob(color: _D.gold.withValues(alpha: 0.10), size: 340),
-          ),
-          Positioned(
-            bottom: 40,
-            left: -90,
-            child: _Blob(color: _D.purple.withValues(alpha: 0.08), size: 300),
-          ),
+          const SolanaMeshBackground(intensity: 0.24),
           SafeArea(
             child: Column(
               children: [
@@ -103,26 +94,11 @@ class _PremiumOfferScreenState extends State<PremiumOfferScreen> {
                     physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
                     children: [
-                      Center(
-                        child: Container(
-                          width: 84,
-                          height: 84,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: const LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [Color(0xFFFBBF24), Color(0xFFA855F7)],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _D.purple.withValues(alpha: 0.28),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 42),
+                      const Center(
+                        child: SolanaMark(
+                          size: 84,
+                          icon: Icons.workspace_premium_rounded,
+                          pulse: 0.6,
                         ),
                       ),
                       const SizedBox(height: 18),
@@ -258,7 +234,7 @@ class _PerkRow extends StatelessWidget {
               ),
             ),
           ),
-          const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 18),
+          const Icon(Icons.check_circle_rounded, color: Solana.green, size: 18),
         ],
       ),
     );
@@ -287,22 +263,10 @@ class _PlanPickCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = featured ? _D.gold : _D.purple;
-    return Container(
-      decoration: BoxDecoration(
-        color: _D.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: featured ? _D.gold.withValues(alpha: 0.55) : _D.cardBord,
-          width: featured ? 1.6 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: accent.withValues(alpha: featured ? 0.16 : 0.06),
-            blurRadius: featured ? 22 : 10,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+    return SolanaGlassCard(
+      glow: featured,
+      radius: 20,
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
@@ -312,13 +276,13 @@ class _PlanPickCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)]),
+                  gradient: Solana.brandH,
                   borderRadius: BorderRadius.circular(99),
                 ),
                 child: Text(
                   badge!,
                   style: const TextStyle(
-                    color: Colors.black,
+                    color: Colors.white,
                     fontWeight: FontWeight.w800,
                     fontSize: 10,
                     letterSpacing: 0.6,
@@ -375,21 +339,21 @@ class _PlanPickCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   gradient: featured
-                      ? const LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFD97706)])
-                      : LinearGradient(colors: [_D.purple, _D.purple.withValues(alpha: 0.85)]),
+                      ? Solana.brandH
+                      : const LinearGradient(colors: [Solana.purple, Color(0xFF7A2FE0)]),
                 ),
                 child: TextButton(
                   onPressed: (iapLoading || !playReady) ? null : onSubscribe,
                   style: TextButton.styleFrom(
-                    foregroundColor: featured ? Colors.black : Colors.white,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   child: Text(
                     iapLoading
                         ? 'Loading Google Play…'
                         : !playReady
-                            ? 'Unavailable in Play'
-                            : (featured ? 'Start yearly' : 'Start monthly'),
+                        ? 'Unavailable in Play'
+                        : (featured ? 'Start yearly' : 'Start monthly'),
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 14,
@@ -406,20 +370,3 @@ class _PlanPickCard extends StatelessWidget {
   }
 }
 
-class _Blob extends StatelessWidget {
-  final Color color;
-  final double size;
-  const _Blob({required this.color, required this.size});
-
-  @override
-  Widget build(BuildContext context) {
-    return ImageFiltered(
-      imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-      ),
-    );
-  }
-}

@@ -52,12 +52,18 @@ class FirebaseSyncService {
     required String displayName,
     required double btcBalance,
     required double totalBtcPerMin,
+    int farmSize = 0,
+    String region = 'all',
+    String flag = '',
   }) async {
     try {
       await _db.ref('$_leaderboard/entries/$uid').set({
         'displayName': displayName,
         'btcBalance': btcBalance,
         'totalBtcPerMin': totalBtcPerMin,
+        'farmSize': farmSize,
+        'region': region,
+        'flag': flag,
         'updatedAt': DateTime.now().millisecondsSinceEpoch,
       });
     } catch (_) {
@@ -72,12 +78,18 @@ class FirebaseSyncService {
       if (!snap.exists || snap.value == null) return [];
       final map = snap.value as Map<dynamic, dynamic>;
       final list = map.entries
-          .map((e) => LeaderboardEntry(
-                uid: e.key as String,
-                displayName: (e.value as Map)['displayName'] as String? ?? 'Unknown',
-                btcBalance: ((e.value as Map)['btcBalance'] as num?)?.toDouble() ?? 0,
-                totalBtcPerMin: ((e.value as Map)['totalBtcPerMin'] as num?)?.toDouble() ?? 0,
-              ))
+          .map((e) {
+            final v = Map<dynamic, dynamic>.from(e.value as Map);
+            return LeaderboardEntry(
+              uid: e.key as String,
+              displayName: v['displayName'] as String? ?? 'Unknown',
+              btcBalance: (v['btcBalance'] as num?)?.toDouble() ?? 0,
+              totalBtcPerMin: (v['totalBtcPerMin'] as num?)?.toDouble() ?? 0,
+              farmSize: (v['farmSize'] as num?)?.toInt() ?? 0,
+              region: v['region'] as String? ?? 'all',
+              flag: v['flag'] as String? ?? '',
+            );
+          })
           .toList();
       list.sort((a, b) => b.btcBalance.compareTo(a.btcBalance));
       return list.take(limit).toList();
@@ -235,11 +247,17 @@ class LeaderboardEntry {
   final String displayName;
   final double btcBalance;
   final double totalBtcPerMin;
+  final int farmSize;
+  final String region;
+  final String flag;
 
   LeaderboardEntry({
     required this.uid,
     required this.displayName,
     required this.btcBalance,
     required this.totalBtcPerMin,
+    this.farmSize = 0,
+    this.region = 'all',
+    this.flag = '',
   });
 }

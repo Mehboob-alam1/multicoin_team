@@ -2,24 +2,17 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'legal_document_screen.dart';
 import '../theme/app_theme.dart';
+import '../theme/solana.dart';
 import '../services/auth_service.dart';
 import '../services/referral_service.dart';
-
-// ─── Design tokens (whitish theme) ───────────────────────────────────────────
-class _D {
-  static const bg       = Color(0xFFF7F8FA);
-  static const card     = Color(0xFFFFFFFF);
-  static const cardBord = Color(0xFFE2E8F0);
-  static const gold     = Color(0xFFF59E0B);
-  static const goldDark = Color(0xFFD97706);
-  static const electric = Color(0xFF0EA5E9);
-  static const textHi   = Color(0xFF0D0F12);
-  static const textMid  = Color(0xFF6B7280);
-  static const textLow  = Color(0xFF9CA3AF);
-}
+import '../widgets/app_brand_logo.dart';
+import '../widgets/screen_ad_slot.dart';
+import '../widgets/solana_widgets.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -32,7 +25,7 @@ class _LoginScreenState extends State<LoginScreen>
     with TickerProviderStateMixin {
   late final AnimationController _orbitCtrl = AnimationController(
     vsync: this,
-    duration: const Duration(seconds: 18),
+    duration: const Duration(seconds: 16),
   )..repeat();
 
   late final AnimationController _entryCtrl = AnimationController(
@@ -42,15 +35,16 @@ class _LoginScreenState extends State<LoginScreen>
 
   late final Animation<double> _fadeIn = CurvedAnimation(
     parent: _entryCtrl,
-    curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+    curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
   );
+
   late final Animation<double> _slideUp = CurvedAnimation(
     parent: _entryCtrl,
-    curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
+    curve: const Interval(0.1, 1.0, curve: Curves.easeOutCubic),
   );
 
   bool _googleLoading = false;
-  bool _guestLoading  = false;
+  bool _guestLoading = false;
   final _referralCtrl = TextEditingController();
 
   @override
@@ -94,26 +88,44 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _toast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: const TextStyle(color: _D.textHi)),
-      backgroundColor: _D.card,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: _D.cardBord),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          msg,
+          style: GoogleFonts.spaceGrotesk(
+            color: const Color(0xFFF4F4F5),
+            fontWeight: FontWeight.w500,
+            fontSize: 13,
+          ),
+        ),
+        backgroundColor: const Color(0xFF18181C),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(
+            color: Color(0x2DFFFFFF),
+            width: 0.8,
+          ),
+        ),
+        margin: const EdgeInsets.all(18),
+        elevation: 6,
       ),
-    ));
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
+    final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: _D.bg,
+      backgroundColor: const Color(0xFF08080A),
       body: Stack(
         children: [
-          // ── Orbiting particle rings ─────────────────────────────────────
+          // ── Background mesh ───────────────────────────────────────────────
+          const SolanaMeshBackground(intensity: 0.24),
+
+          // ── Animated orbits ────────────────────────────────────────────────
           Positioned.fill(
             child: AnimatedBuilder(
               animation: _orbitCtrl,
@@ -123,118 +135,243 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
 
-          // ── Ambient blobs ───────────────────────────────────────────────
+          // ── Ambient blobs ──────────────────────────────────────────────────
           Positioned(
-            top: -100,
-            left: -80,
-            child: _Blob(color: _D.gold.withValues(alpha: 0.07), size: 380),
-          ),
-          Positioned(
-            bottom: 0,
-            right: -100,
-            child: _Blob(color: _D.electric.withValues(alpha: 0.05), size: 300),
+            top: -120,
+            right: -60,
+            child: Container(
+              width: 320,
+              height: 320,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF9945FF).withOpacity(0.08),
+              ),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+                child: const SizedBox.shrink(),
+              ),
+            ),
           ),
 
-          // ── Main content ────────────────────────────────────────────────
+          Positioned(
+            bottom: -80,
+            left: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF14F195).withOpacity(0.06),
+              ),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+                child: const SizedBox.shrink(),
+              ),
+            ),
+          ),
+
+          // ── Main content ───────────────────────────────────────────────────
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: AnimatedBuilder(
                 animation: _entryCtrl,
-                builder: (_, __) => Opacity(
-                  opacity: _fadeIn.value,
-                  child: Transform.translate(
-                    offset: Offset(0, 40 * (1 - _slideUp.value)),
-                    child: Column(
-                      children: [
-                        const Spacer(flex: 3),
+                child: SizedBox(
+                      height: size.height - 100,
+                      child: Column(
+                        children: [
+                          const Spacer(flex: 2),
 
-                        // ── Logo ──────────────────────────────────────────
-                        _AnimatedLogo(orbit: _orbitCtrl),
-                        const SizedBox(height: 28),
+                          // ── Logo ───────────────────────────────────────
+                          _AnimatedLogo(orbit: _orbitCtrl),
+                          const SizedBox(height: 32),
 
-                        // ── Headline ──────────────────────────────────────
-                        const Text(
-                          'Crypto Mining Tycoon',
-                          style: TextStyle(
-                            color: _D.gold,
-                            fontFamily: AppTheme.fontFamily,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 28,
-                            letterSpacing: 2,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        const Text(
-                          'Mine BTC, ETH, SOL & more. Build your empire.',
-                          style: TextStyle(
-                            color: _D.textMid,
-                            fontSize: 15,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-
-                        const Spacer(flex: 3),
-
-                        TextField(
-                          controller: _referralCtrl,
-                          textCapitalization: TextCapitalization.characters,
-                          textAlign: TextAlign.center,
-                          decoration: InputDecoration(
-                            hintText: 'Have a referral code? (optional)',
-                            hintStyle: const TextStyle(color: _D.textLow, fontSize: 13),
-                            filled: true,
-                            fillColor: _D.card,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: _D.cardBord),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: _D.cardBord),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: _D.gold, width: 1.4),
+                          // ── Title ──────────────────────────────────────
+                          ShaderMask(
+                            shaderCallback: (bounds) => const LinearGradient(
+                              colors: [
+                                Color(0xFF9945FF),
+                                Color(0xFF14F195),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ).createShader(bounds),
+                            child: Text(
+                              'Solana Mining Tycoon',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.spaceGrotesk(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 32,
+                                letterSpacing: -0.6,
+                                color: Colors.white,
+                                height: 1.1,
+                              ),
                             ),
                           ),
-                          style: const TextStyle(
-                            color: _D.textHi,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.4,
-                            fontSize: 14,
+                          const SizedBox(height: 12),
+
+                          // ── Subtitle ───────────────────────────────────
+                          Text(
+                            'Stake SOL. Run validators.\nBuild your empire.',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.spaceGrotesk(
+                              color: const Color(0xFFA1A1AA),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              height: 1.5,
+                              letterSpacing: -0.2,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 14),
+                          const Spacer(flex: 2),
 
-                        // ── Buttons ───────────────────────────────────────
-                        _GoogleBtn(
-                          loading: _googleLoading,
-                          disabled: _guestLoading,
-                          onTap: () => _signInGoogle(auth),
-                        ),
-                        const SizedBox(height: 14),
-                        _GuestBtn(
-                          loading: _guestLoading,
-                          disabled: _googleLoading,
-                          onTap: () => _signInGuest(auth),
-                        ),
+                          // ── Referral input ─────────────────────────────
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF18181C).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: const Color(0x2DFFFFFF),
+                                    width: 0.8,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: TextField(
+                                  controller: _referralCtrl,
+                                  textCapitalization:
+                                  TextCapitalization.characters,
+                                  textAlign: TextAlign.center,
+                                  cursorColor: const Color(0xFF14F195),
+                                  decoration: InputDecoration(
+                                    hintText: 'Referral code (optional)',
+                                    hintStyle: GoogleFonts.spaceGrotesk(
+                                      color: const Color(0xFF71717A),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    filled: false,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 18,
+                                      vertical: 16,
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                  ),
+                                  style: GoogleFonts.spaceGrotesk(
+                                    color: const Color(0xFFF4F4F5),
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.8,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
 
-                        const SizedBox(height: 32),
+                          // ── Google sign-in button ──────────────────────
+                          _GradientButton(
+                            label: 'Sign in with Google',
+                            icon: Icons.g_mobiledata_rounded,
+                            loading: _googleLoading,
+                            enabled: !_guestLoading,
+                            onTap: () => _signInGoogle(auth),
+                          ),
+                          const SizedBox(height: 13),
 
-                        // ── Fine print ────────────────────────────────────
-                        const Text(
-                          'By continuing you agree to our Terms & Privacy Policy',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: _D.textLow, fontSize: 11),
-                        ),
+                          // ── Guest button ───────────────────────────────
+                          _OutlineButton(
+                            label: 'Continue as guest',
+                            icon: Icons.person_outline_rounded,
+                            loading: _guestLoading,
+                            enabled: !_googleLoading,
+                            onTap: () => _signInGuest(auth),
+                          ),
+                          const SizedBox(height: 20),
+                          const ScreenAdSlot(title: 'Login offer'),
+                          const SizedBox(height: 24),
 
-                        const Spacer(flex: 1),
-                      ],
+                          // ── Terms text ─────────────────────────────────
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                'By continuing you agree to our ',
+                                style: GoogleFonts.spaceGrotesk(
+                                  color: const Color(0xFF71717A),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  height: 1.6,
+                                  letterSpacing: -0.15,
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () => LegalDocumentScreen.openTerms(context),
+                                child: Text(
+                                  'Terms',
+                                  style: GoogleFonts.spaceGrotesk(
+                                    color: const Color(0xFF14F195),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.6,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: const Color(0xFF14F195),
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                ' & ',
+                                style: GoogleFonts.spaceGrotesk(
+                                  color: const Color(0xFF71717A),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  height: 1.6,
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () => LegalDocumentScreen.openPrivacy(context),
+                                child: Text(
+                                  'Privacy Policy',
+                                  style: GoogleFonts.spaceGrotesk(
+                                    color: const Color(0xFF14F195),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.6,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: const Color(0xFF14F195),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Spacer(flex: 1),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
+                builder: (context, child) {
+                  if (_entryCtrl.status == AnimationStatus.completed) {
+                    return child!;
+                  }
+                  return Opacity(
+                    opacity: _fadeIn.value,
+                    child: Transform.translate(
+                      offset: Offset(0, 40 * (1 - _slideUp.value)),
+                      child: child,
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -244,71 +381,46 @@ class _LoginScreenState extends State<LoginScreen>
   }
 }
 
-// ─── Animated logo ────────────────────────────────────────────────────────────
+// ─── Animated Logo ────────────────────────────────────────────────────────────
 class _AnimatedLogo extends StatelessWidget {
   final AnimationController orbit;
+
   const _AnimatedLogo({required this.orbit});
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: orbit,
     builder: (_, __) {
-      final glow = 0.4 + 0.3 * math.sin(orbit.value * math.pi * 2);
+      final pulse = 0.45 + 0.55 * (0.5 + 0.5 * math.sin(orbit.value * math.pi * 2));
+
       return Stack(
         alignment: Alignment.center,
         children: [
-          // Outer glow ring
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: _D.gold.withValues(alpha: glow * 0.5),
-                  blurRadius: 50 + 20 * glow,
-                  spreadRadius: 4,
+          // ── Rotating gradient ring ─────────────────────────────────────
+          Transform.rotate(
+            angle: orbit.value * math.pi * 2,
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: SweepGradient(
+                  colors: [
+                    const Color(0xFF9945FF).withOpacity(0),
+                    const Color(0xFF9945FF).withOpacity(0.95),
+                    const Color(0xFF14F195).withOpacity(0.95),
+                    const Color(0xFF14F195).withOpacity(0),
+                  ],
+                  stops: const [0, 0.35, 0.65, 1.0],
                 ),
-              ],
-            ),
-          ),
-          // Outer ring
-          Container(
-            width: 104,
-            height: 104,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: SweepGradient(
-                transform: GradientRotation(orbit.value * math.pi * 2),
-                colors: [
-                  _D.gold.withValues(alpha: 0.0),
-                  _D.gold.withValues(alpha: 0.5),
-                  _D.gold.withValues(alpha: 0.0),
-                ],
-              ),
-              border: Border.all(
-                color: _D.gold.withValues(alpha: 0.15),
-                width: 1,
               ),
             ),
           ),
-          // Icon circle
-          Container(
-            width: 88,
-            height: 88,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(colors: [
-                _D.gold.withValues(alpha: 0.25),
-                _D.card,
-              ]),
-              border: Border.all(color: _D.gold.withValues(alpha: 0.4), width: 1.5),
-            ),
-            child: const Icon(
-              Icons.currency_bitcoin,
-              color: _D.gold,
-              size: 46,
-            ),
+
+          // ── Inner circle (glass effect) ────────────────────────────────
+          Transform.scale(
+            scale: 0.98 + 0.04 * pulse,
+            child: const AppBrandLogo(size: 124, hero: true),
           ),
         ],
       );
@@ -316,192 +428,264 @@ class _AnimatedLogo extends StatelessWidget {
   );
 }
 
-// ─── Google sign-in button ────────────────────────────────────────────────────
-class _GoogleBtn extends StatefulWidget {
-  final bool loading;
-  final bool disabled;
-  final VoidCallback onTap;
-  const _GoogleBtn({required this.loading, required this.disabled, required this.onTap});
-
-  @override
-  State<_GoogleBtn> createState() => _GoogleBtnState();
-}
-
-class _GoogleBtnState extends State<_GoogleBtn> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final inactive = widget.loading || widget.disabled;
-    return GestureDetector(
-      onTapDown: inactive ? null : (_) => setState(() => _pressed = true),
-      onTapUp: inactive ? null : (_) { setState(() => _pressed = false); widget.onTap(); },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.97 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        child: Container(
-          width: double.infinity,
-          height: 54,
-          decoration: BoxDecoration(
-            gradient: inactive
-                ? null
-                : const LinearGradient(
-              colors: [Color(0xFFF5A623), Color(0xFFE08800)],
-            ),
-            color: inactive ? _D.cardBord : null,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: inactive
-                ? null
-                : [
-              BoxShadow(
-                color: _D.gold.withValues(alpha: 0.4),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: widget.loading
-              ? const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black)))
-              : Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.g_mobiledata_rounded,
-                  color: inactive ? _D.textLow : Colors.black,
-                  size: 26),
-              const SizedBox(width: 10),
-              Text(
-                'Sign in with Google',
-                style: TextStyle(
-                  color: inactive ? _D.textLow : Colors.black,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Guest button ─────────────────────────────────────────────────────────────
-class _GuestBtn extends StatefulWidget {
-  final bool loading;
-  final bool disabled;
-  final VoidCallback onTap;
-  const _GuestBtn({required this.loading, required this.disabled, required this.onTap});
-
-  @override
-  State<_GuestBtn> createState() => _GuestBtnState();
-}
-
-class _GuestBtnState extends State<_GuestBtn> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final inactive = widget.loading || widget.disabled;
-    return GestureDetector(
-      onTapDown: inactive ? null : (_) => setState(() => _pressed = true),
-      onTapUp: inactive ? null : (_) { setState(() => _pressed = false); widget.onTap(); },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.97 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        child: Container(
-          width: double.infinity,
-          height: 54,
-          decoration: BoxDecoration(
-            color: _D.card,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _D.cardBord, width: 1),
-          ),
-          child: widget.loading
-              ? const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: _D.textMid)))
-              : Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.person_outline_rounded,
-                  color: inactive ? _D.textLow : _D.textMid,
-                  size: 22),
-              const SizedBox(width: 10),
-              Text(
-                'Continue as guest',
-                style: TextStyle(
-                  color: inactive ? _D.textLow : _D.textMid,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Orbit painter ────────────────────────────────────────────────────────────
+// ─── Orbit Painter ────────────────────────────────────────────────────────────
 class _OrbitPainter extends CustomPainter {
   final double t;
+
   const _OrbitPainter(this.t);
 
   @override
   void paint(Canvas canvas, Size size) {
     final cx = size.width / 2;
-    final cy = size.height * 0.38;
+    final cy = size.height * 0.32;
 
-    void drawOrbit(double radius, double speed, double dotSize, Color color, int dots) {
+    void drawOrbit(double radius, double speed, double dotSize, Color color,
+        int dots) {
       final angle = t * math.pi * 2 * speed;
-      // Ring
+
+      // Draw orbit circle
       canvas.drawCircle(
         Offset(cx, cy),
         radius,
         Paint()
-          ..color = color.withValues(alpha: 0.06)
+          ..color = color.withOpacity(0.08)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1,
+          ..strokeWidth = 1.2,
       );
-      // Dots
+
+      // Draw orbiting dots
       for (int i = 0; i < dots; i++) {
         final a = angle + (i / dots) * math.pi * 2;
-        final dx = cx + radius * math.cos(a);
-        final dy = cy + radius * math.sin(a);
+        final x = cx + radius * math.cos(a);
+        final y = cy + radius * math.sin(a);
+
+        // Glow effect
         canvas.drawCircle(
-          Offset(dx, dy),
+          Offset(x, y),
+          dotSize * 1.8,
+          Paint()
+            ..color = color.withOpacity(0.15)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+        );
+
+        // Dot
+        canvas.drawCircle(
+          Offset(x, y),
           dotSize,
-          Paint()..color = color.withValues(alpha: 0.5),
+          Paint()..color = color.withOpacity(0.85),
         );
       }
     }
 
-    drawOrbit(90,  0.4, 2.5, _D.gold,     3);
-    drawOrbit(130, 0.25, 2.0, _D.electric, 4);
-    drawOrbit(170, 0.15, 1.5, _D.gold,     5);
+    drawOrbit(110, 0.45, 2.8, const Color(0xFF9945FF), 3);
+    drawOrbit(160, 0.28, 2.3, const Color(0xFF14F195), 4);
+    drawOrbit(206, 0.16, 1.8, const Color(0xFF9945FF), 5);
   }
 
   @override
   bool shouldRepaint(_OrbitPainter old) => old.t != t;
 }
 
-// ─── Ambient blob ─────────────────────────────────────────────────────────────
-class _Blob extends StatelessWidget {
-  final Color color;
-  final double size;
-  const _Blob({required this.color, required this.size});
+// ─── Gradient Button ──────────────────────────────────────────────────────────
+class _GradientButton extends StatefulWidget {
+  final String label;
+  final IconData icon;
+  final bool loading;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _GradientButton({
+    required this.label,
+    required this.icon,
+    required this.loading,
+    required this.enabled,
+    required this.onTap,
+  });
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-    child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 90, sigmaY: 90),
-      child: const SizedBox.shrink(),
+  State<_GradientButton> createState() => _GradientButtonState();
+}
+
+class _GradientButtonState extends State<_GradientButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTapDown: widget.enabled ? (_) => setState(() => _isPressed = true) : null,
+    onTapUp: widget.enabled
+        ? (_) => setState(() => _isPressed = false)
+        : null,
+    onTapCancel: widget.enabled
+        ? () => setState(() => _isPressed = false)
+        : null,
+    onTap: widget.enabled && !widget.loading ? widget.onTap : null,
+    child: Transform.scale(
+      scale: _isPressed ? 0.96 : 1.0,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          height: 56,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF9945FF), Color(0xFF14F195)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF9945FF).withOpacity(0.35),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: const Color(0xFF14F195).withOpacity(0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.enabled && !widget.loading ? widget.onTap : null,
+              splashColor: Colors.white.withOpacity(0.1),
+              highlightColor: Colors.white.withOpacity(0.1),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (widget.loading)
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
+                    )
+                  else
+                    Icon(
+                      widget.icon,
+                      color: Colors.white.withOpacity(0.95),
+                      size: 20,
+                    ),
+                  const SizedBox(width: 11),
+                  Text(
+                    widget.label,
+                    style: GoogleFonts.spaceGrotesk(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+// ─── Outline Button ───────────────────────────────────────────────────────────
+class _OutlineButton extends StatefulWidget {
+  final String label;
+  final IconData icon;
+  final bool loading;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _OutlineButton({
+    required this.label,
+    required this.icon,
+    required this.loading,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  State<_OutlineButton> createState() => _OutlineButtonState();
+}
+
+class _OutlineButtonState extends State<_OutlineButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTapDown: widget.enabled ? (_) => setState(() => _isPressed = true) : null,
+    onTapUp: widget.enabled
+        ? (_) => setState(() => _isPressed = false)
+        : null,
+    onTapCancel: widget.enabled
+        ? () => setState(() => _isPressed = false)
+        : null,
+    onTap: widget.enabled && !widget.loading ? widget.onTap : null,
+    child: Transform.scale(
+      scale: _isPressed ? 0.96 : 1.0,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            height: 56,
+            decoration: BoxDecoration(
+              color: const Color(0xFF18181C).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0x2DFFFFFF),
+                width: 0.8,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: widget.enabled && !widget.loading ? widget.onTap : null,
+                splashColor: Colors.white.withOpacity(0.05),
+                highlightColor: Colors.white.withOpacity(0.05),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (widget.loading)
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: const Color(0xFFA1A1AA).withOpacity(0.9),
+                        ),
+                      )
+                    else
+                      Icon(
+                        widget.icon,
+                        color: const Color(0xFFA1A1AA).withOpacity(0.9),
+                        size: 20,
+                      ),
+                    const SizedBox(width: 11),
+                    Text(
+                      widget.label,
+                      style: GoogleFonts.spaceGrotesk(
+                        color: const Color(0xFFF4F4F5),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     ),
   );
 }

@@ -1,18 +1,16 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:in_app_review/in_app_review.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../constants/app_constants.dart';
 import '../services/rate_app_service.dart';
+import '../utils/store_launcher.dart';
 
 /// 5-star feedback dialog shown randomly to ask users to rate the app.
 class RateAppDialog {
-  static const _gold = Color(0xFFF59E0B);
-  static const _textHi = Color(0xFF0D0F12);
-  static const _textMid = Color(0xFF6B7280);
-  static const _card = Color(0xFFFFFFFF);
-  static const _cardBord = Color(0xFFE2E8F0);
+  static const _gold = Color(0xFF9945FF);
+  static const _textHi = Color(0xFFF4F4F5);
+  static const _textMid = Color(0xFFA1A1AA);
+  static const _card = Color(0xFF16161F);
+  static const _cardBord = Color(0xFF27272A);
 
   static Future<void> show(BuildContext context) async {
     final rateService = context.read<RateAppService>();
@@ -42,10 +40,10 @@ class RateAppDialog {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.currency_bitcoin_rounded, color: _gold, size: 48),
+                  Icon(Icons.hexagon_rounded, color: _gold, size: 48),
                   const SizedBox(height: 16),
                   const Text(
-                    'Enjoying Crypto Mining Tycoon?',
+                    'Enjoying Solana Mining Tycoon?',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: _textHi,
@@ -99,18 +97,7 @@ class RateAppDialog {
     );
     await rateService.markRateDialogShown();
     if (result == true) {
-      try {
-        final review = InAppReview.instance;
-        if (await review.isAvailable()) {
-          await review.requestReview();
-        } else {
-          final uri = Uri.parse(AppConstants.playStoreUrl);
-          if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
-      } catch (_) {
-        final uri = Uri.parse(AppConstants.playStoreUrl);
-        if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
+      await StoreLauncher.openListing();
     }
   }
 }

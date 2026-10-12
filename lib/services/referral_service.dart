@@ -39,6 +39,7 @@ class ReferralService extends ChangeNotifier {
   static const _cacheKeyFriends = 'referral_friends';
   static const _claimedKey = 'referral_claimed';
   static const _queuedCodeKey = 'referral_queued_join_code';
+  static const _guestCodeKey = 'referral_guest_code';
   static const _alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
   String? _uid;
@@ -48,6 +49,7 @@ class ReferralService extends ChangeNotifier {
   int _pendingJoinBonuses = 0;
   List<String> _claimed = [];
   List<ReferredUser> _referredUsers = [];
+  bool _loadInFlight = false;
 
   String? get myCode => _myCode;
   String? get referredBy => _referredBy;
@@ -71,7 +73,54 @@ class ReferralService extends ChangeNotifier {
     return raw.trim().toUpperCase();
   }
 
-  Future<void> load(String uid, {String? displayName}) async {
+  /// Shows a code in Profile even before Firebase Auth exists; persists it locally
+  /// and writes to Firestore when possible.
+  Future<void> ensureLoaded({
+    required String? uid,
+    String? displayName,
+    required bool signedIn,
+  }) async {
+    if (uid == null || uid.isEmpty) {
+      await _loadUnsignedGuest(displayName: displayName);
+      return;
+    }
+    if (_uid == uid && _myCode != null && _myCode!.isNotEmpty && !_loadInFlight) {
+      return;
+    }
+    await load(uid, displayName: displayName, signedIn: signedIn);
+  }
+
+  Future<void> _loadUnsignedGuest({String? displayName}) async {
+    await LocalFeatureStore.init();
+    var code = LocalFeatureStore.get(_guestCodeKey)?.toString();
+    if (code == null || code.isEmpty) {
+      code = _randomSix();
+      await LocalFeatureStore.set(_guestCodeKey, code);
+    }
+    code = code.toUpperCase();
+    _uid = null;
+    _myCode = code;
+    await LocalFeatureStore.set(_cacheKeyCode, code);
+    notifyListeners();
+    try {
+      final docId = 'guest_$code';
+      await _firestore.collection('referrals').doc(docId).set({
+        'code': code,
+        'uid': docId,
+        'friends': 0,
+        'isGuest': true,
+        'displayName': displayName ?? 'Guest Miner',
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      await _ensureCodeIndex(code, docId);
+    } catch (e) {
+      debugPrint('ReferralService._loadUnsignedGuest: $e');
+    }
+  }
+
+  Future<void> load(String uid, {String? displayName, bool signedIn = true}) async {
+    if (_loadInFlight && _uid == uid) return;
+    _loadInFlight = true;
     _uid = uid;
     await LocalFeatureStore.init();
     final rawClaimed = LocalFeatureStore.get(_claimedKey, const <String>[]);
@@ -87,27 +136,35 @@ class ReferralService extends ChangeNotifier {
       final docRef = _firestore.collection('referrals').doc(uid);
       final doc = await docRef.get();
       if (!doc.exists) {
-        final code = await _claimUniqueCode(uid);
+        final code = await _assignCode(uid, signedIn: signedIn);
         _myCode = code;
         _friends = 0;
         _pendingJoinBonuses = 0;
         _referredBy = null;
         await docRef.set({
           'code': code,
+          'uid': uid,
           'friends': 0,
           'pendingJoinBonuses': 0,
+          'isGuest': !signedIn,
           'displayName': displayName ?? 'Miner',
           'createdAt': FieldValue.serverTimestamp(),
         });
       } else {
         final d = doc.data() ?? {};
         var code = d['code']?.toString();
-        if (code == null || code.isEmpty) {
-          code = await _claimUniqueCode(uid);
-          await docRef.set({'code': code}, SetOptions(merge: true));
-        } else {
-          await _ensureCodeIndex(code, uid);
+        final previous = (code != null && code.isNotEmpty) ? code.toUpperCase() : null;
+        final assigned = await _assignCode(uid, signedIn: signedIn, existing: previous);
+        if (previous != null && previous != assigned) {
+          await _ensureCodeIndex(previous, uid);
         }
+        code = assigned;
+        await docRef.set({
+          'code': code,
+          'uid': uid,
+          'isGuest': !signedIn,
+          if (previous != null && previous != code) 'previousCode': previous,
+        }, SetOptions(merge: true));
         _myCode = code;
         _friends = (d['friends'] as num?)?.toInt() ?? 0;
         _pendingJoinBonuses = (d['pendingJoinBonuses'] as num?)?.toInt() ?? 0;
@@ -143,10 +200,21 @@ class ReferralService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('ReferralService.load: $e');
+      if (_myCode == null || _myCode!.isEmpty) {
+        final fromUid = codeCandidatesFromUid(uid);
+        _myCode = signedIn
+            ? (fromUid.isNotEmpty ? fromUid.first : _randomSix())
+            : (LocalFeatureStore.get(_guestCodeKey)?.toString() ?? _randomSix());
+      }
+    } finally {
+      _loadInFlight = false;
     }
 
     await LocalFeatureStore.set(_cacheKeyCode, _myCode);
     await LocalFeatureStore.set(_cacheKeyFriends, _friends);
+    if (!signedIn && _myCode != null) {
+      await LocalFeatureStore.set(_guestCodeKey, _myCode);
+    }
     notifyListeners();
   }
 
@@ -288,16 +356,67 @@ class ReferralService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String> _claimUniqueCode(String uid) async {
+  /// Signed-in: last 6 digits of Firebase uid, else first 6 digits, else last/first 6 chars.
+  /// Guest / not signed in: stable random 6-character code.
+  static List<String> codeCandidatesFromUid(String uid) {
+    final digits = uid.replaceAll(RegExp(r'[^0-9]'), '');
+    final alnum = uid.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    final out = <String>[];
+    void add(String value) {
+      if (value.length == 6 && !out.contains(value)) out.add(value);
+    }
+
+    if (digits.length >= 6) {
+      add(digits.substring(digits.length - 6));
+      add(digits.substring(0, 6));
+    }
+    if (alnum.length >= 6) {
+      add(alnum.substring(alnum.length - 6));
+      add(alnum.substring(0, 6));
+    }
+    return out;
+  }
+
+  String _randomSix() {
     final rng = Random.secure();
+    return List.generate(6, (_) => _alphabet[rng.nextInt(_alphabet.length)]).join();
+  }
+
+  Future<String> _assignCode(
+    String uid, {
+    required bool signedIn,
+    String? existing,
+  }) async {
+    final candidates = <String>[];
+    if (signedIn) {
+      candidates.addAll(codeCandidatesFromUid(uid));
+    } else {
+      if (existing != null && existing.isNotEmpty) {
+        candidates.add(existing.toUpperCase());
+      }
+      final cached = LocalFeatureStore.get(_guestCodeKey)?.toString();
+      if (cached != null && cached.isNotEmpty) {
+        candidates.add(cached.toUpperCase());
+      }
+    }
+    if (existing != null && existing.isNotEmpty && signedIn) {
+      // Prefer uid-based codes, but keep a working existing code if all uid slices are taken.
+      candidates.add(existing.toUpperCase());
+    }
+
+    for (final c in candidates) {
+      if (c.length < 4) continue;
+      final claimed = await _tryIndexCode(c, uid);
+      if (claimed) return c;
+    }
     for (var i = 0; i < 16; i++) {
-      final code = List.generate(8, (_) => _alphabet[rng.nextInt(_alphabet.length)]).join();
+      final code = _randomSix();
       final claimed = await _tryIndexCode(code, uid);
       if (claimed) return code;
     }
     final fallback = (uid.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase() + _alphabet)
-        .padRight(8, 'X')
-        .substring(0, 8);
+        .padRight(6, 'X')
+        .substring(0, 6);
     await _tryIndexCode(fallback, uid);
     return fallback;
   }

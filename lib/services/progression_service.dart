@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../config/mining_economy.dart';
 import '../models/mining_location.dart';
 import 'local_feature_store.dart';
 
@@ -32,7 +33,8 @@ class ProgressionService extends ChangeNotifier {
     bool changed = false;
     for (final loc in MiningLocations.all) {
       if (_unlocked.contains(loc.id)) continue;
-      if (balanceBtc >= loc.unlockBtc || hashRate >= loc.unlockHashRate) {
+      if (balanceBtc >= MiningEconomy.toSol(loc.unlockBtc) ||
+          hashRate >= MiningEconomy.toSol(loc.unlockHashRate)) {
         _unlocked = [..._unlocked, loc.id];
         changed = true;
       }

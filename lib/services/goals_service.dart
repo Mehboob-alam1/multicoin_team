@@ -17,7 +17,7 @@ class GoalsService extends ChangeNotifier {
   bool _dailyClaimed = false;
   bool _weeklyClaimed = false;
 
-  static const double dailyTargetBtc = 0.0001;
+  static const double dailyTargetBtc = 0.05;
   static const int weeklyTargetSessions = 5;
   static const double dailyRewardBtc = 0.00002;
   static const double weeklyRewardBtc = 0.00005;
@@ -71,7 +71,6 @@ class GoalsService extends ChangeNotifier {
     _dailyProgressBtc += btc;
     if (_dailyProgressBtc > dailyTargetBtc) _dailyProgressBtc = dailyTargetBtc;
     await LocalFeatureStore.set(_dailyProgressKey, _dailyProgressBtc);
-    notifyListeners();
   }
 
   Future<void> addWeeklySession() async {

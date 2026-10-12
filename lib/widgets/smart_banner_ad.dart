@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
 
+import '../services/ad_remote_config_service.dart';
+import '../services/game_state_service.dart';
 import '../services/smart_ad_manager.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 class _D {
-  static const card     = Color(0xFFFFFFFF);
-  static const cardBord = Color(0xFFE2E8F0);
-  static const textLow  = Color(0xFF9CA3AF);
+  static const card     = Color(0xFF16161F);
+  static const cardBord = Color(0xFF27272A);
+  static const textLow  = Color(0xFF71717A);
 }
 
 class SmartBannerAd extends StatefulWidget {
@@ -22,6 +24,7 @@ class _SmartBannerAdState extends State<SmartBannerAd>
     with SingleTickerProviderStateMixin {
   BannerHandle? _handle;
   bool _loading = true;
+  bool _loadStarted = false;
 
   late final AnimationController _fadeCtrl = AnimationController(
     vsync: this,
@@ -33,14 +36,30 @@ class _SmartBannerAdState extends State<SmartBannerAd>
   );
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final h = await context.read<SmartAdManager>().loadBanner(AdSize.banner);
-      if (!mounted) { h?.dispose(); return; }
-      setState(() { _handle = h; _loading = false; });
-      if (h != null) _fadeCtrl.forward();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_loadStarted || !TickerMode.of(context)) return;
+    _loadStarted = true;
+    _load();
+  }
+
+  Future<void> _load() async {
+    final cfg = context.read<AdRemoteConfigService>();
+    final game = context.read<GameStateService>();
+    if (game.isPremiumActive || !cfg.bannerEnabled) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+    final h = await context.read<SmartAdManager>().loadBanner(AdSize.banner);
+    if (!mounted) {
+      h?.dispose();
+      return;
+    }
+    setState(() {
+      _handle = h;
+      _loading = false;
     });
+    if (h != null) _fadeCtrl.forward();
   }
 
   @override
@@ -52,6 +71,9 @@ class _SmartBannerAdState extends State<SmartBannerAd>
 
   @override
   Widget build(BuildContext context) {
+    final premium = context.watch<GameStateService>().isPremiumActive;
+    final cfg = context.watch<AdRemoteConfigService>();
+    if (premium || !cfg.bannerEnabled) return const SizedBox.shrink();
     // Still loading — show slim shimmer placeholder
     if (_loading) return _BannerShimmer();
 
@@ -60,44 +82,10 @@ class _SmartBannerAdState extends State<SmartBannerAd>
     if (h == null) return const SizedBox.shrink();
 
     // Ad ready — fade in
-    return FadeTransition(
-      opacity: _fadeAnim,
-      child: Container(
-        width: 320,
-        height: 50,
-        decoration: BoxDecoration(
-          color: _D.card,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _D.cardBord),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            AdWidget(ad: h.ad),
-            // Subtle "AD" label pinned top-right so it's always visible
-            Positioned(
-              top: 3,
-              right: 6,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(
-                  color: _D.cardBord,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'AD',
-                  style: TextStyle(
-                    color: _D.textLow,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return SizedBox(
+      width: 320,
+      height: 50,
+      child: AdWidget(ad: h.ad),
     );
   }
 }

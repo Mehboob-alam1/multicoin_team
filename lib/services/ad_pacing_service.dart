@@ -13,11 +13,11 @@ class AdPacingService extends ChangeNotifier {
   static const _dailyRewardedCountKey = 'ads_daily_rewarded_count';
   static const _dailyAdChallengeClaimedKey = 'ads_daily_ad_challenge_claimed';
 
-  static const _interstitialCooldown = Duration(minutes: 3);
-  static const _appOpenCooldown = Duration(minutes: 20);
+  static const _interstitialCooldown = Duration(seconds: 6);
+  static const _appOpenCooldown = Duration(seconds: 45);
   static const _rewardedCooldown = Duration(seconds: 45);
-  static const _maxInterstitialPerDay = 10;
-  static const _maxAppOpenPerDay = 4;
+  static const _maxInterstitialPerDay = 40;
+  static const _maxAppOpenPerDay = 8;
   static const _interstitialEveryNTransitions = 1;
   static const dailyAdChallengeTarget = 6;
   static const dailyAdChallengeRewardBtc = 0.000006;
@@ -77,6 +77,13 @@ class AdPacingService extends ChangeNotifier {
   }
 
   Future<bool> shouldShowInterstitial({required int completedSessions}) async {
+    await _rolloverIfNeeded();
+    if (_dailyInterstitialCount >= _maxInterstitialPerDay) return false;
+    if (_navTransitions < _interstitialEveryNTransitions) return false;
+    if (_lastInterstitialAt != null &&
+        DateTime.now().difference(_lastInterstitialAt!) < _interstitialCooldown) {
+      return false;
+    }
     return true;
   }
 
@@ -92,7 +99,7 @@ class AdPacingService extends ChangeNotifier {
 
   Future<bool> canShowAppOpen({required int completedSessions}) async {
     await _rolloverIfNeeded();
-    if (completedSessions < 1) return false;
+    if (_dailyAppOpenCount >= _maxAppOpenPerDay) return false;
     if (_lastAppOpenAt != null &&
         DateTime.now().difference(_lastAppOpenAt!) < _appOpenCooldown) {
       return false;

@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../data/test_miners.dart';
+import 'sound_service.dart';
 import '../models/coin.dart';
 import '../models/farm_tier.dart';
 import '../models/mining_rig.dart';
@@ -18,6 +21,7 @@ class GameStateService extends ChangeNotifier {
   final FirebaseSyncService _firebaseSync;
   static const _key = 'btc_sim_player_data';
   static const _foregroundSnapshotKey = 'btc_sim_foreground_snapshot';
+  static const _premiumExpiryKey = 'btc_sim_premium_expiry';
   static const _maxIdleMinutes = 8 * 60;
   static const _sessionMinutes = 30;
   static const _minRemoteSyncInterval = Duration(minutes: 12);
@@ -41,6 +45,9 @@ class GameStateService extends ChangeNotifier {
   double _prestigeMultiplier = 1.0;
   int _locationCapacityBonus = 0;
   double _rigDiscount = 0.0;
+
+  VoidCallback? onMiningStarted;
+  VoidCallback? onMiningStopped;
 
   bool get isLoaded => _loaded;
   String get displayName => _displayName;
@@ -79,7 +86,7 @@ class GameStateService extends ChangeNotifier {
     return _totalBtcPerMinWithSession(isSessionActive);
   }
 
-  /// Rate in BTC/min (primary currency). When [sessionActive] true, applies 1.25× session bonus.
+  /// Rate in SOL/min (primary currency). When [sessionActive] true, applies 1.25× session bonus.
   double _totalBtcPerMinWithSession(bool sessionActive) {
     return _totalRatePerCoinWithSession(Coins.primaryId, sessionActive);
   }
@@ -182,7 +189,26 @@ class GameStateService extends ChangeNotifier {
   /// Whether a coin is currently selected for mining.
   bool isMiningCoin(String coinId) => selectedMiningCoinIds.contains(coinId);
 
+  String get _premiumPrefsKey =>
+      _userId != null ? '${_premiumExpiryKey}_$_userId' : _premiumExpiryKey;
+
+  Future<void> _readCachedPremium(SharedPreferences prefs) async {
+    final ms = prefs.getInt(_premiumPrefsKey);
+    if (ms == null) return;
+    _premiumExpiry = DateTime.fromMillisecondsSinceEpoch(ms);
+  }
+
+  Future<void> _writeCachedPremium(SharedPreferences prefs) async {
+    if (_premiumExpiry == null) {
+      await prefs.remove(_premiumPrefsKey);
+    } else {
+      await prefs.setInt(_premiumPrefsKey, _premiumExpiry!.millisecondsSinceEpoch);
+    }
+  }
+
   Future<void> load() async {
+    if (_loaded && _fetchedRemoteThisSession) return;
+
     final prefs = await SharedPreferences.getInstance();
     final key = _userId != null ? '${_key}_$_userId' : _key;
 
@@ -200,16 +226,32 @@ class GameStateService extends ChangeNotifier {
         } catch (_) {}
       }
     }
+    await _readCachedPremium(prefs);
 
-    // For logged-in user: fetch remote only once per app session to reduce Firebase usage.
-    // If no local data (e.g. fresh install), do NOT use remote so user always starts from 0.
+    _lastTick = DateTime.now();
+    if (_data.miningSessionEndsAt != null &&
+        _data.miningSessionEndsAt!.isBefore(DateTime.now())) {
+      _data = _data.copyWith(miningSessionEndsAt: null);
+    }
+    _applyIdleEarnings();
+    if (_userId != null) await _applyIdleFromForegroundSnapshotIfNeeded(prefs, key);
+    await _persist(forceRemote: false, markDirty: false);
+    _loaded = true;
+    notifyListeners();
+
     if (_userId != null && !_fetchedRemoteThisSession) {
       _fetchedRemoteThisSession = true;
+      unawaited(_mergeRemoteAfterLocal(hadLocalData));
+    }
+  }
+
+  Future<void> _mergeRemoteAfterLocal(bool hadLocalData) async {
+    if (_userId == null) return;
+    try {
       final remote = await _firebaseSync.fetchPlayerData(_userId!);
       if (remote != null && hadLocalData) {
         final localData = _data;
         _data = remote;
-        // Never lose mining balance: take max of local vs remote per coin.
         final mergedCoins = Map<String, double>.from(_data.coinBalances);
         for (final e in localData.coinBalances.entries) {
           final cur = mergedCoins[e.key] ?? 0;
@@ -229,22 +271,16 @@ class GameStateService extends ChangeNotifier {
           lifetimeMinedBtc: lifeBtc,
         );
       }
-      final oneTime = await _firebaseSync.getOneTimePurchases(_userId!);
-      _purchasedOneTimeIds = oneTime;
+      _purchasedOneTimeIds = await _firebaseSync.getOneTimePurchases(_userId!);
       _premiumExpiry = await _firebaseSync.getSubscriptionExpiry(_userId!);
       _boostExpiry = await _loadBoostExpiry();
+      final prefs = await SharedPreferences.getInstance();
+      await _writeCachedPremium(prefs);
+      await _persist(forceRemote: false, markDirty: false);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('GameState remote merge: $e');
     }
-
-    _lastTick = DateTime.now();
-    if (_data.miningSessionEndsAt != null &&
-        _data.miningSessionEndsAt!.isBefore(DateTime.now())) {
-      _data = _data.copyWith(miningSessionEndsAt: null);
-    }
-    _applyIdleEarnings();
-    if (_userId != null) await _applyIdleFromForegroundSnapshotIfNeeded(prefs, key);
-    await _persist(forceRemote: false, markDirty: false);
-    _loaded = true;
-    notifyListeners();
   }
 
   /// If app was killed without lifecycle (e.g. force-close), we may have a
@@ -382,6 +418,10 @@ class GameStateService extends ChangeNotifier {
           displayName: _displayName,
           btcBalance: btcBalance,
           totalBtcPerMin: totalBtcPerMin,
+          farmSize: ownedRigIds.length,
+          region: TestMiners.regionFromCountryCode(
+            PlatformDispatcher.instance.locale.countryCode,
+          ),
         );
         _lastRemoteSyncAt = now;
         _remoteDirty = false;
@@ -446,7 +486,9 @@ class GameStateService extends ChangeNotifier {
   /// Cost for next [rig] (exponential scaling by how many already owned).
   double rigCost(MiningRig rig) {
     final count = _data.ownedRigIds.where((id) => id == rig.id).length;
-    return MiningRigs.costForCount(rig, count) * (1 - _rigDiscount.clamp(0.0, 0.9));
+    return MiningRigs.costForCount(rig, count) *
+        MiningEconomy.unitScale *
+        (1 - _rigDiscount.clamp(0.0, 0.9));
   }
 
   Future<void> buyRig(MiningRig rig) async {
@@ -501,15 +543,17 @@ class GameStateService extends ChangeNotifier {
 
   Future<void> grantDirectBtc(double amount) async {
     if (amount <= 0) return;
-    _data = _addMinedToCoin(_data, Coins.primaryId, amount);
+    _data = _addMinedToCoin(_data, Coins.primaryId, MiningEconomy.toSol(amount));
     await _persist();
     notifyListeners();
+    SoundService.instance.reward();
   }
 
   Future<void> grantRig(String rigId) async {
     _data = _data.copyWith(ownedRigIds: [..._data.ownedRigIds, rigId]);
     await _persist();
     notifyListeners();
+    SoundService.instance.reward();
   }
 
   bool hasPurchasedOneTime(String productId) => _purchasedOneTimeIds.contains(productId);
@@ -537,7 +581,9 @@ class GameStateService extends ChangeNotifier {
     if (day < 1 || day > 7) return;
     final btc = dailyRewardBtc(day);
     final rigId = dailyRewardRigId(day);
-    if (btc != null && btc > 0) _data = _addMinedToCoin(_data, Coins.primaryId, btc);
+    if (btc != null && btc > 0) {
+      _data = _addMinedToCoin(_data, Coins.primaryId, MiningEconomy.toSol(btc));
+    }
     List<String> newRigs = List.from(_data.ownedRigIds);
     if (rigId != null) newRigs.add(rigId);
     _data = _data.copyWith(
@@ -547,6 +593,7 @@ class GameStateService extends ChangeNotifier {
     );
     await _persist();
     notifyListeners();
+    SoundService.instance.reward();
   }
 
   Future<void> claimDaily() async {
@@ -564,7 +611,7 @@ class GameStateService extends ChangeNotifier {
       case 'sessions_20':
         return _data.totalSessionsStarted >= 20;
       case 'lifetime_0005':
-        return lifetimeMinedBtc >= 0.0005;
+        return lifetimeMinedBtc >= MiningEconomy.toSol(0.0005);
       default:
         return false;
     }
@@ -589,7 +636,9 @@ class GameStateService extends ChangeNotifier {
     }
     final newClaimed = [..._data.claimedMilestones, id];
     final newRigs = [..._data.ownedRigIds, if (rewardRig != null) rewardRig];
-    if (rewardBtc > 0) _data = _addMinedToCoin(_data, Coins.primaryId, rewardBtc);
+    if (rewardBtc > 0) {
+      _data = _addMinedToCoin(_data, Coins.primaryId, MiningEconomy.toSol(rewardBtc));
+    }
     _data = _data.copyWith(
       ownedRigIds: newRigs,
       claimedMilestones: newClaimed,
@@ -619,6 +668,8 @@ class GameStateService extends ChangeNotifier {
           : now;
       expiry = base.add(Duration(days: delivery.durationDays));
       _premiumExpiry = expiry;
+      final prefs = await SharedPreferences.getInstance();
+      await _writeCachedPremium(prefs);
     }
 
     if (_userId != null) {
@@ -648,7 +699,7 @@ class GameStateService extends ChangeNotifier {
     }
     if (p != null) {
       if (p.btcAmount != null && p.btcAmount! > 0) {
-        _data = _addMinedToCoin(_data, Coins.primaryId, p.btcAmount!);
+        _data = _addMinedToCoin(_data, Coins.primaryId, MiningEconomy.toSol(p.btcAmount!));
       }
       if (p.rigId != null) {
         _data = _data.copyWith(ownedRigIds: [..._data.ownedRigIds, p.rigId!]);
@@ -676,7 +727,9 @@ class GameStateService extends ChangeNotifier {
         _purchasedOneTimeIds = [..._purchasedOneTimeIds, productId];
       }
     }
-    if (btcAmount != null && btcAmount > 0) _data = _addMinedToCoin(_data, Coins.primaryId, btcAmount);
+    if (btcAmount != null && btcAmount > 0) {
+      _data = _addMinedToCoin(_data, Coins.primaryId, MiningEconomy.toSol(btcAmount));
+    }
     List<String> newRigs = List.from(_data.ownedRigIds);
     if (rigId != null) newRigs.add(rigId);
     _data = _data.copyWith(ownedRigIds: newRigs);
@@ -705,13 +758,25 @@ class GameStateService extends ChangeNotifier {
     );
     await _persist();
     notifyListeners();
+    SoundService.instance.miningStart();
+    onMiningStarted?.call();
+  }
+
+  Future<void> stopMiningSession() async {
+    if (_data.miningSessionEndsAt == null) return;
+    _data = _data.copyWith(miningSessionEndsAt: null);
+    await _persist();
+    notifyListeners();
+    SoundService.instance.miningStop();
+    onMiningStopped?.call();
   }
 
   Future<void> upgradeFarm() async {
     final next = nextFarmTier;
     if (next == null) return;
-    if (btcBalance < next.upgradeCostBtc) return;
-    _data = _updatePrimaryBalance(_data, -next.upgradeCostBtc);
+    final cost = MiningEconomy.toSol(next.upgradeCostBtc);
+    if (btcBalance < cost) return;
+    _data = _updatePrimaryBalance(_data, -cost);
     _data = _data.copyWith(farmLevel: next.level);
     await _persist();
     notifyListeners();
@@ -728,6 +793,8 @@ class GameStateService extends ChangeNotifier {
       await _firebaseSync.recordSubscription(_userId!, planId, expiry);
     }
     _premiumExpiry = expiry;
+    final prefs = await SharedPreferences.getInstance();
+    await _writeCachedPremium(prefs);
     await _persist();
     notifyListeners();
   }
@@ -756,7 +823,9 @@ class GameStateService extends ChangeNotifier {
       default:
         return;
     }
-    if (btc > 0) _data = _addMinedToCoin(_data, Coins.primaryId, btc);
+    if (btc > 0) {
+      _data = _addMinedToCoin(_data, Coins.primaryId, MiningEconomy.toSol(btc));
+    }
     List<String> newRigs = List.from(_data.ownedRigIds);
     if (rigId != null) newRigs.add(rigId);
     _data = _data.copyWith(ownedRigIds: newRigs);
@@ -769,6 +838,7 @@ class GameStateService extends ChangeNotifier {
     }
     await _persist();
     notifyListeners();
+    SoundService.instance.reward();
   }
 
   void updateTick() => tick();
@@ -777,6 +847,8 @@ class GameStateService extends ChangeNotifier {
     final now = DateTime.now();
     if (_data.miningSessionEndsAt != null && _data.miningSessionEndsAt!.isBefore(now)) {
       _data = _data.copyWith(miningSessionEndsAt: null);
+      SoundService.instance.miningStop();
+      onMiningStopped?.call();
     }
     if (_lastTick != null) {
       final diff = now.difference(_lastTick!);

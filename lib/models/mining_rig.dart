@@ -38,8 +38,10 @@ class MiningRig {
     this.costScaling = 1.0,
   });
 
-  /// Rate for a specific coin (coins per min). Uses [ratePerCoin] if set, else [btcPerMin] only for btc.
+  /// Rate for a specific coin (coins per min). Primary (SOL) always uses [btcPerMin]
+  /// so every rig participates in the Solana economy at the same relative ranking.
   double rateForCoin(String coinId) {
+    if (coinId == Coins.primaryId) return btcPerMin;
     if (ratePerCoin.isNotEmpty && ratePerCoin.containsKey(coinId)) {
       return ratePerCoin[coinId]!;
     }
@@ -47,7 +49,8 @@ class MiningRig {
     return 0;
   }
 
-  bool supportsCoin(String coinId) => supportedCoins.contains(coinId);
+  bool supportsCoin(String coinId) =>
+      coinId == Coins.primaryId || supportedCoins.contains(coinId);
 }
 
 /// Mining rigs: legacy (BTC-only) plus new multi-coin types. Exponential cost scaling for progression.
@@ -149,7 +152,7 @@ class MiningRigs {
   );
   static const asicBtcMiner = MiningRig(
     id: 'asic_btc',
-    name: 'ASIC Bitcoin Miner',
+    name: 'Solana Validator',
     btcPerMin: 5e-6,
     level: 4,
     assetName: 'warehouse',
