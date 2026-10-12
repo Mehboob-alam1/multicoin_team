@@ -1,0 +1,177 @@
+{
+  "iapCatalog": {
+    "premium_monthly": {
+      "googleProductId": "premium_monthly",
+      "name": "Premium Monthly",
+      "type": "subscription",
+      "category": "premium",
+      "priceUsd": 4.99,
+      "period": "month"
+    },
+    "premium_yearly": {
+      "googleProductId": "premium_yearly",
+      "name": "Premium Yearly",
+      "type": "subscription",
+      "category": "premium",
+      "priceUsd": 29.99,
+      "period": "year"
+    },
+    "starter_pack": {
+      "googleProductId": "starter_pack",
+      "name": "Starter Pack",
+      "type": "non_consumable",
+      "category": "one_time",
+      "priceUsd": 1.99
+    },
+    "satoshi_pack": {
+      "googleProductId": "satoshi_pack",
+      "name": "Satoshi Pack",
+      "type": "non_consumable",
+      "category": "one_time",
+      "priceUsd": 4.99
+    },
+    "boost_2x_1h": {
+      "googleProductId": "boost_2x_1h",
+      "name": "2x Boost (1 hour)",
+      "type": "consumable",
+      "category": "one_time",
+      "priceUsd": 0.99
+    },
+    "mega_pack": {
+      "googleProductId": "mega_pack",
+      "name": "Mega Pack",
+      "type": "non_consumable",
+      "category": "one_time",
+      "priceUsd": 9.99
+    },
+    "season_pass": {
+      "googleProductId": "season_pass",
+      "name": "Season Pass",
+      "type": "non_consumable",
+      "category": "one_time",
+      "priceUsd": 2.99
+    },
+    "hash_booster_20": {
+      "googleProductId": "hash_booster_20",
+      "name": "Hash Booster",
+      "type": "non_consumable",
+      "category": "one_time",
+      "priceUsd": 19.99
+    },
+    "power_pack_30": {
+      "googleProductId": "power_pack_30",
+      "name": "Power Miner Pack",
+      "type": "non_consumable",
+      "category": "one_time",
+      "priceUsd": 29.99
+    },
+    "pro_upgrade_50": {
+      "googleProductId": "pro_upgrade_50",
+      "name": "Pro Mining Upgrade",
+      "type": "non_consumable",
+      "category": "one_time",
+      "priceUsd": 49.99
+    },
+    "elite_bundle_100": {
+      "googleProductId": "elite_bundle_100",
+      "name": "Elite Hash Bundle",
+      "type": "non_consumable",
+      "category": "one_time",
+      "priceUsd": 99.99
+    },
+    "tycoon_kit_150": {
+      "googleProductId": "tycoon_kit_150",
+      "name": "Tycoon Mining Kit",
+      "type": "non_consumable",
+      "category": "one_time",
+      "priceUsd": 149.99
+    },
+    "ultimate_pack_200": {
+      "googleProductId": "ultimate_pack_200",
+      "name": "Ultimate Miner Pack",
+      "type": "non_consumable",
+      "category": "one_time",
+      "priceUsd": 199.00
+    },
+    "laptop_rig": {
+      "googleProductId": "laptop_rig",
+      "name": "Laptop miner",
+      "type": "consumable",
+      "category": "farm_rig",
+      "rigId": "laptop",
+      "priceUsd": 0.99
+    },
+    "rig_gpu": {
+      "googleProductId": "rig_gpu",
+      "name": "GPU rig",
+      "type": "consumable",
+      "category": "farm_rig",
+      "rigId": "gpu_rig",
+      "priceUsd": 2.99
+    },
+    "rig_rack": {
+      "googleProductId": "rig_rack",
+      "name": "Mining rack",
+      "type": "consumable",
+      "category": "farm_rig",
+      "rigId": "mining_rack",
+      "priceUsd": 9.99
+    },
+    "warehouse_farm_rig": {
+      "googleProductId": "warehouse_farm_rig",
+      "name": "Warehouse farm",
+      "type": "consumable",
+      "category": "farm_rig",
+      "rigId": "warehouse_farm",
+      "priceUsd": 19.99
+    },
+    "mega_facility_rig": {
+      "googleProductId": "mega_facility_rig",
+      "name": "Mega mining facility",
+      "type": "consumable",
+      "category": "farm_rig",
+      "rigId": "mega_facility",
+      "priceUsd": 49.99
+    },
+    "cpu_miner_rig": {
+      "googleProductId": "cpu_miner_rig",
+      "name": "CPU Miner",
+      "type": "consumable",
+      "category": "farm_rig",
+      "rigId": "cpu_miner",
+      "priceUsd": 0.99
+    },
+    "gaming_gpu_rig_iap": {
+      "googleProductId": "gaming_gpu_rig_iap",
+      "name": "Gaming GPU Rig",
+      "type": "consumable",
+      "category": "farm_rig",
+      "rigId": "gaming_gpu_rig",
+      "priceUsd": 2.99
+    },
+    "gpu_cluster_rig": {
+      "googleProductId": "gpu_cluster_rig",
+      "name": "GPU Mining Cluster",
+      "type": "consumable",
+      "category": "farm_rig",
+      "rigId": "gpu_cluster",
+      "priceUsd": 9.99
+    },
+    "asic_btc_rig": {
+      "googleProductId": "asic_btc_rig",
+      "name": "ASIC Bitcoin Miner",
+      "type": "consumable",
+      "category": "farm_rig",
+      "rigId": "asic_btc",
+      "priceUsd": 19.99
+    },
+    "data_center_rig_iap": {
+      "googleProductId": "data_center_rig_iap",
+      "name": "Advanced Data Center Rig",
+      "type": "consumable",
+      "category": "farm_rig",
+      "rigId": "data_center_rig",
+      "priceUsd": 49.99
+    }
+  }
+}

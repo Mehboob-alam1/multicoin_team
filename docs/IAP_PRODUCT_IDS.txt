@@ -10,7 +10,8 @@ Currency reference: USD ($)
 --------------------------------------------------------------------------------
 1) FARM RIGS — product ID, price, in-game rig ID
 --------------------------------------------------------------------------------
-(Repeatable / consumable SKUs on Mining Farm; each purchase adds one rig.)
+(Repeatable / consumable SKUs on Mining Farm; each purchase adds one rig.
+ Google Play type = Consumable. Product ID = googleProductId in the app and in Firebase.)
 
   PRODUCT ID                 PRICE      RIG ID (game)
   ------------------------   -------    ------------------

@@ -395,7 +395,9 @@ class MiningFarmScreen extends StatelessWidget {
                         ...MiningRigs.all.map((rig) {
                           final count   = counts[rig.id] ?? 0;
                           final product = ShopProducts.farmIapProductForRig(rig.id);
-                          final storeProduct = product != null ? iap.getProduct(product.id) : null;
+                          final storeProduct = product != null
+                              ? iap.getProduct(product.googleProductId)
+                              : null;
                           final catalogPrice = product?.price ?? '';
                           final livePrice = storeProduct?.price ?? '';
                           final priceStrUsd = livePrice.isNotEmpty
@@ -418,7 +420,7 @@ class MiningFarmScreen extends StatelessWidget {
                               farmMiningMultiplier: game.currentFarmTier.miningMultiplier,
                               onBuyWithUsd:   product != null && canTryIap
                                   ? () async {
-                                      final pid = product.id;
+                                      final pid = product.googleProductId;
                                       if (iap.getProduct(pid) == null) {
                                         await iap.loadProducts();
                                       }
@@ -427,7 +429,7 @@ class MiningFarmScreen extends StatelessWidget {
                                         _toast(
                                           context,
                                           iap.error ??
-                                              'Could not load this product. Check Play Console IDs.',
+                                              'Could not load Google Play product "$pid". Create this ID in Play Console.',
                                         );
                                         return;
                                       }

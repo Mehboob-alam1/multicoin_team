@@ -1,35 +1,86 @@
-PLAY STORE PRODUCT IDS – Bitcoin Mining
+PLAY STORE PRODUCT IDS – Crypto Mining Tycoon
 =============================================
+Package: com.crypto.blockchain.mining.tycoon
 
-Add these in Google Play Console (Monetize → Products → In-app products / Subscriptions).
-Use the Product ID exactly as shown. Names and descriptions can match or be adapted for the store listing.
+Add these in Google Play Console → Monetize → Products.
+Use the Product ID exactly as shown. Types must match.
 
-
-ONE-TIME PRODUCTS (In-app products)
------------------------------------
-Name                    Description                              Product ID            Price
-Starter Pack            Small BTC + 1 GPU rig                    starter_pack           $1.99
-Satoshi Pack            ~2 days mining worth                     satoshi_pack           $4.99
-Mega Pack               Larger BTC + Mining rack                  mega_pack              $9.99
-2x Boost (1 hour)       Double mining rate for 1 hour            boost_2x_1h             $0.99
-Season Pass              Unlock premium season rewards           season_pass             $2.99
-
-Hash Booster             Permanent +6% mining rate               hash_booster_20        $19.99
-Power Miner Pack         Permanent +8% mining + 0.0003 BTC       power_pack_30          $29.99
-Pro Mining Upgrade       Permanent +12% mining + 0.0008 BTC      pro_upgrade_50         $49.99
-Elite Hash Bundle        Permanent +18% mining + 0.002 BTC       elite_bundle_100       $99.99
-Tycoon Mining Kit        Permanent +22% mining + 0.004 BTC       tycoon_kit_150         $149.99
-Ultimate Miner Pack      Permanent +25% mining + 0.006 BTC       ultimate_pack_200      $199.00
+SUBSCRIPTIONS (Monetize → Products → Subscriptions)
+---------------------------------------------------
+Name                  Product ID          Price
+Premium Monthly       premium_monthly     $4.99 / month
+Premium Yearly        premium_yearly      $29.99 / year
 
 
-SUBSCRIPTIONS
--------------
-Name                  Description                          Product ID        Price
-Premium Monthly       Exclusive rigs, 1.5x mining, no ads  premium_monthly   $4.99/mo
-Premium Yearly        Best value — save 50%                premium_yearly    $29.99/yr
+IN-APP PRODUCTS — NON-CONSUMABLE (one-time, owned forever)
+----------------------------------------------------------
+Name                    Product ID            Price
+Starter Pack            starter_pack           $1.99
+Satoshi Pack            satoshi_pack           $4.99
+Mega Pack               mega_pack              $9.99
+Season Pass             season_pass            $2.99
+Hash Booster            hash_booster_20        $19.99
+Power Miner Pack        power_pack_30          $29.99
+Pro Mining Upgrade      pro_upgrade_50         $49.99
+Elite Hash Bundle       elite_bundle_100       $99.99
+Tycoon Mining Kit       tycoon_kit_150         $149.99
+Ultimate Miner Pack     ultimate_pack_200      $199.00
 
 
-COPY-PASTE PRODUCT IDS
------------------------
-In-app products:  starter_pack, satoshi_pack, mega_pack, boost_2x_1h, season_pass, hash_booster_20, power_pack_30, pro_upgrade_50, elite_bundle_100, tycoon_kit_150, ultimate_pack_200
-Subscriptions:    premium_monthly, premium_yearly
+IN-APP PRODUCTS — CONSUMABLE (can buy many times)
+-------------------------------------------------
+Name                         Product ID              Price
+2x Boost (1 hour)            boost_2x_1h             $0.99
+Laptop miner                 laptop_rig              $0.99
+GPU rig                      rig_gpu                 $2.99
+Mining rack                  rig_rack                $9.99
+Warehouse farm               warehouse_farm_rig      $19.99
+Mega mining facility         mega_facility_rig       $49.99
+CPU Miner                    cpu_miner_rig           $0.99
+Gaming GPU Rig               gaming_gpu_rig_iap      $2.99
+GPU Mining Cluster           gpu_cluster_rig         $9.99
+ASIC Bitcoin Miner           asic_btc_rig            $19.99
+Advanced Data Center Rig     data_center_rig_iap     $49.99
+
+
+COPY-PASTE IDS
+--------------
+Subscriptions:
+premium_monthly
+premium_yearly
+
+Non-consumable:
+starter_pack
+satoshi_pack
+mega_pack
+season_pass
+hash_booster_20
+power_pack_30
+pro_upgrade_50
+elite_bundle_100
+tycoon_kit_150
+ultimate_pack_200
+
+Consumable:
+boost_2x_1h
+laptop_rig
+rig_gpu
+rig_rack
+warehouse_farm_rig
+mega_facility_rig
+cpu_miner_rig
+gaming_gpu_rig_iap
+gpu_cluster_rig
+asic_btc_rig
+data_center_rig_iap
+
+
+FIREBASE REALTIME DATABASE
+--------------------------
+Import config/firebase_iap_catalog.json at the database root (creates /iapCatalog).
+
+Each Google Play purchase is stored under:
+  users/{uid}/purchases/googleHistory/{pushId}
+  users/{uid}/purchases/oneTime/{productId}     (packs / upgrades)
+  users/{uid}/purchases/farmRigs/{pushId}       (each rig buy)
+  users/{uid}/purchases/subscription            (premium plan + expiry)

@@ -30,6 +30,7 @@ import 'services/prestige_service.dart';
 import 'services/mini_game_service.dart';
 import 'services/season_service.dart';
 import 'screens/login_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/premium_offer_screen.dart';
 import 'screens/home_shell.dart';
 import 'screens/profile_screen.dart';
@@ -81,7 +82,7 @@ class BtcSimApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         initialRoute: '/',
         routes: {
-          '/': _authWrapper,
+          '/': (ctx) => const SplashScreen(),
           '/login': (ctx) => const LoginScreen(),
           '/premium-offer': (ctx) => const PremiumOfferScreen(),
           '/home': (ctx) => const HomeShell(),
@@ -93,17 +94,6 @@ class BtcSimApp extends StatelessWidget {
           '/shop': (ctx) => const ShopScreen(),
         },
       ),
-    );
-  }
-
-  Widget _authWrapper(BuildContext context) {
-    return Consumer<AuthService>(
-      builder: (_, auth, __) {
-        if (auth.currentUser != null) {
-          return const HomeShell();
-        }
-        return const LoginScreen();
-      },
     );
   }
 }

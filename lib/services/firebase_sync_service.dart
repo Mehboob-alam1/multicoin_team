@@ -17,6 +17,9 @@ class FirebaseSyncService {
   static const _oneTime = 'oneTime';
   static const _subscription = 'subscription';
   static const _boostExpiryMs = 'boostExpiryMs';
+  static const _googleHistory = 'googleHistory';
+  static const _farmRigs = 'farmRigs';
+  static const _iapCatalog = 'iapCatalog';
 
   /// Sync full player data to Firebase (merge with cloud).
   Future<void> syncPlayerData(String uid, PlayerData data, {String? displayName}) async {
@@ -83,10 +86,71 @@ class FirebaseSyncService {
     }
   }
 
-  /// Record one-time purchase (store in Firebase).
+  /// Record one-time purchase entitlement (store in Firebase).
   Future<void> recordOneTimePurchase(String uid, String productId) async {
     try {
-      await _db.ref('$_users/$uid/$_purchases/$_oneTime/$productId').set(DateTime.now().millisecondsSinceEpoch);
+      await _db.ref('$_users/$uid/$_purchases/$_oneTime/$productId').set({
+        'at': DateTime.now().millisecondsSinceEpoch,
+        'googleProductId': productId,
+        'source': 'google_play',
+      });
+    } catch (_) {
+      rethrow;
+    }
+  }
+
+  /// Full Google Play purchase record: entitlement + history (and farm line if a rig).
+  Future<void> recordGooglePlayPurchase({
+    required String uid,
+    required String productId,
+    required String category,
+    required bool isSubscription,
+    required bool isConsumable,
+    DateTime? subscriptionExpiry,
+    String? purchaseId,
+    String? purchaseToken,
+    String? rigId,
+    String source = 'google_play',
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final payload = <String, dynamic>{
+      'productId': productId,
+      'googleProductId': productId,
+      'category': category,
+      'source': source,
+      'at': now,
+      if (purchaseId != null && purchaseId.isNotEmpty) 'orderId': purchaseId,
+      if (purchaseToken != null && purchaseToken.isNotEmpty) 'purchaseToken': purchaseToken,
+      if (rigId != null) 'rigId': rigId,
+    };
+
+    try {
+      await _db.ref('$_users/$uid/$_purchases/$_googleHistory').push().set(payload);
+
+      if (isSubscription && subscriptionExpiry != null) {
+        await _db.ref('$_users/$uid/$_purchases/$_subscription').set({
+          'planId': productId,
+          'googleProductId': productId,
+          'expiryMs': subscriptionExpiry.millisecondsSinceEpoch,
+          'source': source,
+          if (purchaseId != null) 'orderId': purchaseId,
+          if (purchaseToken != null) 'purchaseToken': purchaseToken,
+        });
+        return;
+      }
+
+      if (isConsumable && category == 'farm_rig') {
+        await _db.ref('$_users/$uid/$_purchases/$_farmRigs').push().set(payload);
+      }
+
+      if (!isConsumable || category == 'one_time') {
+        await _db.ref('$_users/$uid/$_purchases/$_oneTime/$productId').set({
+          'at': now,
+          'googleProductId': productId,
+          'source': source,
+          if (purchaseId != null) 'lastOrderId': purchaseId,
+        });
+      }
     } catch (_) {
       rethrow;
     }
@@ -97,7 +161,9 @@ class FirebaseSyncService {
     try {
       await _db.ref('$_users/$uid/$_purchases/$_subscription').set({
         'planId': planId,
+        'googleProductId': planId,
         'expiryMs': expiry.millisecondsSinceEpoch,
+        'source': 'google_play',
       });
     } catch (_) {
       rethrow;

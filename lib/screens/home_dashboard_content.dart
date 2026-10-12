@@ -28,7 +28,7 @@ class HomeBalanceHero extends StatelessWidget {
     final price = priceService.priceUsd;
     final change24h = priceService.priceChange24h;
     final isUp = priceService.isPriceUp;
-    final parts = btcBalance.toStringAsFixed(8).split('.');
+    final parts = btcBalance.toStringAsFixed(12).split('.');
 
     return Container(
       padding: const EdgeInsets.all(HomeTheme.lg),
@@ -65,36 +65,40 @@ class HomeBalanceHero extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      parts[0],
-                      style: HomeTheme.monoNumber(fontSize: 32, weight: FontWeight.w800).copyWith(
-                        color: HomeTheme.limeTextHigh,
-                        height: 1.0,
-                      ),
-                    ),
-                    Text(
-                      '.${parts[1]}',
-                      style: HomeTheme.monoNumber(fontSize: 18, weight: FontWeight.w600).copyWith(
-                        color: HomeTheme.lime,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
-                      child: Text(
-                        'BTC',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: HomeTheme.lime,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        parts[0],
+                        style: HomeTheme.monoNumber(fontSize: 28, weight: FontWeight.w800).copyWith(
+                          color: HomeTheme.limeTextHigh,
+                          height: 1.0,
                         ),
                       ),
-                    ),
-                  ],
+                      Text(
+                        '.${parts[1]}',
+                        style: HomeTheme.monoNumber(fontSize: 13, weight: FontWeight.w600).copyWith(
+                          color: HomeTheme.lime,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Text(
+                          'BTC',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: HomeTheme.lime,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Row(

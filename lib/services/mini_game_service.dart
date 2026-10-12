@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'local_feature_store.dart';
 
-/// Simple mini-games for bonus BTC (e.g. tap coin 10 times in 5 sec). Limited plays per day.
+/// Hash-burst mini-game: tap to simulate short-burst hashing. Limited plays per day.
 class MiniGameService extends ChangeNotifier {
   static const _lastPlayDayKey = 'minigame_last_play_day';
   static const _playsTodayKey = 'minigame_plays_today';
@@ -10,9 +10,10 @@ class MiniGameService extends ChangeNotifier {
   int _playsToday = 0;
 
   static const int maxPlaysPerDay = 3;
-  static const int tapTarget = 10;
-  static const int tapTimeSec = 5;
-  static const double rewardBtc = 0.00002;
+  /// ~3 hashes/sec for 12s — doable by hand, not an instant 10-tap toy.
+  static const int tapTarget = 36;
+  static const int tapTimeSec = 12;
+  static const double rewardBtc = 0.000004;
 
   int get playsToday => _playsToday;
   int get playsLeft => (maxPlaysPerDay - _playsToday).clamp(0, maxPlaysPerDay);

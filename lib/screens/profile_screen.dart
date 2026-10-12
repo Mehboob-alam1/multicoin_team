@@ -757,10 +757,12 @@ class _ShareButton extends StatelessWidget {
 class _EnterReferralCode extends StatefulWidget {
   final AuthService auth;
   final ReferralService referral;
+  final GameStateService game;
 
   const _EnterReferralCode({
     required this.auth,
     required this.referral,
+    required this.game,
   });
 
   @override
@@ -815,12 +817,22 @@ class _EnterReferralCodeState extends State<_EnterReferralCode> {
                 return;
               }
               setState(() => _loading = true);
-              await widget.referral.applyReferral(uid, code);
-              await widget.referral.load(uid);
+              final name = widget.auth.currentUser?.displayName ??
+                  widget.auth.currentUser?.email ??
+                  'Miner';
+              final result = await widget.referral.applyReferral(
+                uid,
+                code,
+                displayName: name,
+              );
+              if (result.ok) {
+                await widget.game.grantDirectBtc(ReferralService.welcomeBonusBtc);
+                await widget.referral.load(uid, displayName: name);
+              }
               if (mounted) {
                 setState(() => _loading = false);
-                _toast(context, 'Referral code applied!');
-                _controller.clear();
+                _toast(context, result.message);
+                if (result.ok) _controller.clear();
               }
             },
             style: ElevatedButton.styleFrom(
@@ -906,12 +918,67 @@ class _ReferralCard extends StatelessWidget {
         const Icon(Icons.group_rounded, color: _D.textMid, size: 14),
         const SizedBox(width: 6),
         Text(
-          '${referral.friends} friend${referral.friends == 1 ? '' : 's'} referred',
+          '${referral.friends} friend${referral.friends == 1 ? '' : 's'} joined',
           style: const TextStyle(color: _D.textMid, fontSize: 12),
         ),
+        const Spacer(),
+        Text(
+          '+${ReferralService.inviterBonusBtc.toStringAsFixed(5)} BTC each',
+          style: const TextStyle(color: _D.green, fontSize: 11, fontWeight: FontWeight.w700),
+        ),
       ]),
+      if (referral.referredUsers.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        const Text(
+          'Your referrals',
+          style: TextStyle(color: _D.textHi, fontSize: 12, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        ...referral.referredUsers.take(12).map((u) => Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: _D.pink.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.person_rounded, color: _D.pink, size: 16),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  u.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: _D.textHi, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+              if (u.joinedAt != null)
+                Text(
+                  '${u.joinedAt!.day}/${u.joinedAt!.month}/${u.joinedAt!.year}',
+                  style: const TextStyle(color: _D.textLow, fontSize: 11),
+                ),
+            ],
+          ),
+        )),
+      ] else ...[
+        const SizedBox(height: 8),
+        const Text(
+          'No referrals yet. Share your code — you earn BTC every time someone joins.',
+          style: TextStyle(color: _D.textLow, fontSize: 11),
+        ),
+      ],
       const SizedBox(height: 14),
-      _EnterReferralCode(auth: auth, referral: referral),
+      if (referral.hasUsedReferralCode)
+        const Text(
+          'You already joined with a friend\'s code.',
+          style: TextStyle(color: _D.textMid, fontSize: 12),
+        )
+      else
+        _EnterReferralCode(auth: auth, referral: referral, game: game),
       const SizedBox(height: 14),
 
       // Reward buttons

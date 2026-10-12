@@ -3,32 +3,47 @@ import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../models/shop_product.dart';
 
-/// Product IDs must match Google Play Console & App Store Connect.
+/// Result of a verified Google Play (or App Store) purchase.
+class IapPurchaseDelivery {
+  final String productId;
+  final bool isSubscription;
+  final int durationDays;
+  final String? purchaseId;
+  final String? purchaseToken;
+  final String source;
+
+  const IapPurchaseDelivery({
+    required this.productId,
+    required this.isSubscription,
+    required this.durationDays,
+    this.purchaseId,
+    this.purchaseToken,
+    this.source = 'google_play',
+  });
+}
+
+/// Product IDs come from [ShopProducts] and must match Google Play Console.
 class IapService extends ChangeNotifier {
-  static const oneTimeIds = {
-    'starter_pack', 'satoshi_pack', 'mega_pack', 'boost_2x_1h', 'season_pass',
-    'laptop_rig', 'rig_gpu', 'rig_rack', 'warehouse_farm_rig', 'mega_facility_rig',
-    'cpu_miner_rig', 'gaming_gpu_rig_iap', 'gpu_cluster_rig', 'asic_btc_rig', 'data_center_rig_iap',
-    'hash_booster_20', 'power_pack_30', 'pro_upgrade_50',
-    'elite_bundle_100', 'tycoon_kit_150', 'ultimate_pack_200',
-  };
-  static const subscriptionIds = {'premium_monthly', 'premium_yearly'};
-  static const allIds = {...oneTimeIds, ...subscriptionIds};
+  static Set<String> get oneTimeIds => ShopProducts.googlePlayOneTimeIds;
+  static Set<String> get subscriptionIds => ShopProducts.googlePlaySubscriptionIds;
+  static Set<String> get allIds => ShopProducts.googlePlayAllIds;
 
   final InAppPurchase _iap = InAppPurchase.instance;
   List<ProductDetails> _products = [];
   bool _available = false;
   bool _loading = false;
+  bool _initialized = false;
   String? _error;
   StreamSubscription<List<PurchaseDetails>>? _subscription;
+  final Set<String> _fulfilledKeys = {};
 
   List<ProductDetails> get products => List.unmodifiable(_products);
   bool get available => _available;
   bool get loading => _loading;
   String? get error => _error;
 
-  /// Called when a purchase or restore completes. App should apply reward and record in Firebase.
-  void Function(String productId, bool isSubscription, int durationDays)? onPurchaseSuccess;
+  /// Called when a Google Play / store purchase or restore completes.
+  void Function(IapPurchaseDelivery delivery)? onPurchaseSuccess;
 
   ProductDetails? getProduct(String id) {
     try {
@@ -38,10 +53,18 @@ class IapService extends ChangeNotifier {
     }
   }
 
+  /// True when billing is up and this Google Play product was returned by the store.
+  bool isGoogleProductReady(String productId) =>
+      _available && getProduct(productId) != null;
+
   Future<void> init() async {
+    if (_initialized && _available) {
+      await loadProducts();
+      return;
+    }
     _available = await _iap.isAvailable();
     if (!_available) {
-      _error = 'Store not available';
+      _error = 'Google Play Billing is not available on this device.';
       notifyListeners();
       return;
     }
@@ -53,6 +76,7 @@ class IapService extends ChangeNotifier {
         notifyListeners();
       },
     );
+    _initialized = true;
     await loadProducts();
   }
 
@@ -64,7 +88,10 @@ class IapService extends ChangeNotifier {
     try {
       final response = await _iap.queryProductDetails(allIds);
       if (response.notFoundIDs.isNotEmpty) {
-        _error = 'Products not found: ${response.notFoundIDs.join(", ")}. Configure them in Play Console / App Store Connect.';
+        _error =
+            'Google Play products not found: ${response.notFoundIDs.join(", ")}. '
+            'Create these IDs in Play Console (In-app products / Subscriptions) '
+            'and publish to the same package name.';
       }
       _products = response.productDetails;
     } catch (e) {
@@ -77,28 +104,55 @@ class IapService extends ChangeNotifier {
   void _onPurchaseUpdate(List<PurchaseDetails> details) {
     for (final d in details) {
       if (d.status == PurchaseStatus.purchased || d.status == PurchaseStatus.restored) {
-        _deliverPurchase(d.productID);
+        _deliverPurchase(d);
+        if (d.pendingCompletePurchase) _iap.completePurchase(d);
+      } else if (d.status == PurchaseStatus.error) {
+        _error = d.error?.message ?? 'Purchase failed';
+        notifyListeners();
         if (d.pendingCompletePurchase) _iap.completePurchase(d);
       }
     }
   }
 
-  void _deliverPurchase(String productId) {
+  void _deliverPurchase(PurchaseDetails details) {
+    final token = details.verificationData.serverVerificationData;
+    final key = details.purchaseID ?? token;
+    if (key.isNotEmpty && !_fulfilledKeys.add(key)) return;
+
+    final productId = details.productID;
     final isSubscription = subscriptionIds.contains(productId);
-    int durationDays = 30;
+    var durationDays = 30;
     if (productId == 'premium_yearly') durationDays = 365;
-    onPurchaseSuccess?.call(productId, isSubscription, durationDays);
+    final plan = ShopProducts.planById(productId);
+    if (plan != null) durationDays = plan.durationDays;
+
+    onPurchaseSuccess?.call(IapPurchaseDelivery(
+      productId: productId,
+      isSubscription: isSubscription,
+      durationDays: durationDays,
+      purchaseId: details.purchaseID,
+      purchaseToken: token.isNotEmpty ? token : null,
+      source: details.verificationData.source.isNotEmpty
+          ? details.verificationData.source
+          : 'google_play',
+    ));
   }
 
-  /// Start purchase flow for one-time product (starter_pack, satoshi_pack, mega_pack, boost_2x_1h).
-  /// Farm rig SKUs use [buyConsumable] so the same product can be purchased multiple times
-  /// (configure those products as **consumable** in Play Console / consumable in App Store).
+  /// One-time Google Play product. Farm rigs + 1h boost are consumable.
   Future<bool> buyProduct(String productId) async {
-    final product = getProduct(productId);
-    if (product == null) return false;
+    var product = getProduct(productId);
+    if (product == null) {
+      await loadProducts();
+      product = getProduct(productId);
+    }
+    if (product == null) {
+      _error = 'Google Play product "$productId" is not available. Check Play Console.';
+      notifyListeners();
+      return false;
+    }
     try {
       final param = PurchaseParam(productDetails: product);
-      if (ShopProducts.isRepeatableFarmRigProduct(productId)) {
+      if (ShopProducts.isConsumableGoogleProduct(productId)) {
         return await _iap.buyConsumable(purchaseParam: param, autoConsume: true);
       }
       return await _iap.buyNonConsumable(purchaseParam: param);
@@ -109,12 +163,22 @@ class IapService extends ChangeNotifier {
     }
   }
 
-  /// Start purchase flow for subscription (premium_monthly, premium_yearly).
+  /// Google Play subscription (`premium_monthly`, `premium_yearly`).
   Future<bool> buySubscription(String productId) async {
-    final product = getProduct(productId);
-    if (product == null) return false;
+    var product = getProduct(productId);
+    if (product == null) {
+      await loadProducts();
+      product = getProduct(productId);
+    }
+    if (product == null) {
+      _error = 'Google Play subscription "$productId" is not available. Check Play Console.';
+      notifyListeners();
+      return false;
+    }
     try {
-      return await _iap.buyNonConsumable(purchaseParam: PurchaseParam(productDetails: product));
+      return await _iap.buyNonConsumable(
+        purchaseParam: PurchaseParam(productDetails: product),
+      );
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -122,7 +186,6 @@ class IapService extends ChangeNotifier {
     }
   }
 
-  /// Restore previous purchases; results come via purchaseStream and onPurchaseSuccess.
   Future<void> restorePurchases() async {
     if (!_available) return;
     try {
@@ -133,7 +196,9 @@ class IapService extends ChangeNotifier {
     }
   }
 
+  @override
   void dispose() {
     _subscription?.cancel();
+    super.dispose();
   }
 }

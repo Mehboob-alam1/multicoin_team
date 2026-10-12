@@ -543,7 +543,7 @@ class _BalanceHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final intPart = btcBalance.floor().toString();
-    final decPart = '.${btcBalance.toStringAsFixed(8).split('.')[1]}';
+    final decPart = '.${btcBalance.toStringAsFixed(12).split('.')[1]}';
 
     return Container(
       decoration: BoxDecoration(
@@ -612,30 +612,34 @@ class _BalanceHero extends StatelessWidget {
 
             const SizedBox(height: 26),
 
-            // Balance display
-            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text(
-                intPart,
-                style: GoogleFonts.dmSans(
-                  fontSize: 52, fontWeight: FontWeight.w700,
-                  color: _T.ink, height: 1.0, letterSpacing: -2.0,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  decPart,
-                  style: GoogleFonts.jetBrainsMono(
-                    fontSize: 20, fontWeight: FontWeight.w500,
-                    color: _T.amber, height: 1.0, letterSpacing: -0.3,
+            // Balance display (12 decimal places)
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Text(
+                  intPart,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 44, fontWeight: FontWeight.w700,
+                    color: _T.ink, height: 1.0, letterSpacing: -1.6,
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 9, left: 8),
-                child: Text('BTC', style: _label(size: 12, weight: FontWeight.w600, color: _T.inkMid, letterSpacing: 1.0)),
-              ),
-            ]),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    decPart,
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 15, fontWeight: FontWeight.w500,
+                      color: _T.amber, height: 1.0, letterSpacing: -0.4,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8, left: 8),
+                  child: Text('BTC', style: _label(size: 12, weight: FontWeight.w600, color: _T.inkMid, letterSpacing: 1.0)),
+                ),
+              ]),
+            ),
 
             const SizedBox(height: 5),
             Text(

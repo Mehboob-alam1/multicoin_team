@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
+import '../services/referral_service.dart';
 
 // ─── Design tokens (whitish theme) ───────────────────────────────────────────
 class _D {
@@ -50,17 +51,26 @@ class _LoginScreenState extends State<LoginScreen>
 
   bool _googleLoading = false;
   bool _guestLoading  = false;
+  final _referralCtrl = TextEditingController();
 
   @override
   void dispose() {
     _orbitCtrl.dispose();
     _entryCtrl.dispose();
+    _referralCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _stashReferralCode() async {
+    final code = _referralCtrl.text.trim();
+    if (code.isEmpty) return;
+    await context.read<ReferralService>().queueJoinCode(code);
   }
 
   Future<void> _signInGoogle(AuthService auth) async {
     setState(() => _googleLoading = true);
     try {
+      await _stashReferralCode();
       await auth.signInWithGoogle();
       if (mounted) Navigator.of(context).pushReplacementNamed('/premium-offer');
     } catch (e) {
@@ -73,6 +83,7 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _signInGuest(AuthService auth) async {
     setState(() => _guestLoading = true);
     try {
+      await _stashReferralCode();
       await auth.signInAnonymously();
       if (mounted) Navigator.of(context).pushReplacementNamed('/premium-offer');
     } catch (e) {
@@ -164,6 +175,38 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
 
                         const Spacer(flex: 3),
+
+                        TextField(
+                          controller: _referralCtrl,
+                          textCapitalization: TextCapitalization.characters,
+                          textAlign: TextAlign.center,
+                          decoration: InputDecoration(
+                            hintText: 'Have a referral code? (optional)',
+                            hintStyle: const TextStyle(color: _D.textLow, fontSize: 13),
+                            filled: true,
+                            fillColor: _D.card,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(color: _D.cardBord),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(color: _D.cardBord),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(color: _D.gold, width: 1.4),
+                            ),
+                          ),
+                          style: const TextStyle(
+                            color: _D.textHi,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.4,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
 
                         // ── Buttons ───────────────────────────────────────
                         _GoogleBtn(

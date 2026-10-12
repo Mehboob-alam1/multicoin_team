@@ -10,6 +10,7 @@ import '../models/shop_product.dart';
 import '../game_engine/mining_engine.dart';
 import 'background_mining_task.dart';
 import 'firebase_sync_service.dart';
+import 'iap_service.dart';
 
 class GameStateService extends ChangeNotifier {
   GameStateService(this._firebaseSync);
@@ -593,6 +594,66 @@ class GameStateService extends ChangeNotifier {
       ownedRigIds: newRigs,
       claimedMilestones: newClaimed,
     );
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Grant entitlements after Google Play Billing confirms a purchase, and write it to Firebase.
+  Future<void> fulfillGooglePlayPurchase(IapPurchaseDelivery delivery) async {
+    final productId = delivery.productId;
+    final p = ShopProducts.oneTimeById(productId);
+    final category = ShopProducts.iapCategory(productId);
+    final isConsumable = ShopProducts.isConsumableGoogleProduct(productId);
+
+    if (!delivery.isSubscription &&
+        !isConsumable &&
+        hasPurchasedOneTime(productId)) {
+      return;
+    }
+
+    DateTime? expiry;
+    if (delivery.isSubscription) {
+      final now = DateTime.now();
+      final base = (_premiumExpiry != null && _premiumExpiry!.isAfter(now))
+          ? _premiumExpiry!
+          : now;
+      expiry = base.add(Duration(days: delivery.durationDays));
+      _premiumExpiry = expiry;
+    }
+
+    if (_userId != null) {
+      try {
+        await _firebaseSync.recordGooglePlayPurchase(
+          uid: _userId!,
+          productId: productId,
+          category: category,
+          isSubscription: delivery.isSubscription,
+          isConsumable: isConsumable,
+          subscriptionExpiry: expiry,
+          purchaseId: delivery.purchaseId,
+          purchaseToken: delivery.purchaseToken,
+          rigId: p?.rigId,
+          source: delivery.source,
+        );
+        if (!delivery.isSubscription) {
+          _purchasedOneTimeIds = await _firebaseSync.getOneTimePurchases(_userId!);
+        }
+      } catch (_) {}
+    } else if (!delivery.isSubscription && !_purchasedOneTimeIds.contains(productId)) {
+      _purchasedOneTimeIds = [..._purchasedOneTimeIds, productId];
+    }
+
+    if (productId == 'boost_2x_1h') {
+      await activateBoost1h();
+    }
+    if (p != null) {
+      if (p.btcAmount != null && p.btcAmount! > 0) {
+        _data = _addMinedToCoin(_data, Coins.primaryId, p.btcAmount!);
+      }
+      if (p.rigId != null) {
+        _data = _data.copyWith(ownedRigIds: [..._data.ownedRigIds, p.rigId!]);
+      }
+    }
     await _persist();
     notifyListeners();
   }

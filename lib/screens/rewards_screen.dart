@@ -147,9 +147,20 @@ class RewardsScreen extends StatelessWidget {
                         const SizedBox(height: 20),
 
                         // ── Mini-game (tap challenge) ──────────────────
-                        _SectionLabel(label: 'TAP CHALLENGE'),
+                        _SectionLabel(label: 'HASH BURST'),
                         const SizedBox(height: 10),
                         _MiniGameCard(),
+                        const SizedBox(height: 20),
+
+                        // ── Daily watch-ads challenge ────────────────
+                        _SectionLabel(label: 'DAILY AD CHALLENGE'),
+                        const SizedBox(height: 10),
+                        _DailyAdChallengeCard(
+                          pacing: pacing,
+                          ad: ad,
+                          adCfg: adCfg,
+                          game: game,
+                        ),
                         const SizedBox(height: 20),
 
                         // ── Ad rewards ───────────────────────────────
@@ -434,6 +445,155 @@ class _DailyCycleRow extends StatelessWidget {
   }
 }
 
+// ─── Daily watch-6-ads challenge ──────────────────────────────────────────────
+class _DailyAdChallengeCard extends StatelessWidget {
+  final AdPacingService pacing;
+  final SmartAdManager ad;
+  final AdRemoteConfigService adCfg;
+  final GameStateService game;
+
+  const _DailyAdChallengeCard({
+    required this.pacing,
+    required this.ad,
+    required this.adCfg,
+    required this.game,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = pacing.dailyAdChallengeProgress;
+    final target = AdPacingService.dailyAdChallengeTarget;
+    final claimed = pacing.dailyAdChallengeClaimed;
+    final canClaim = pacing.canClaimDailyAdChallenge;
+    final frac = (progress / target).clamp(0.0, 1.0);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: _D.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: canClaim ? _D.green.withValues(alpha: 0.45) : _D.electric.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: _D.electric.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.play_circle_filled_rounded, color: _D.electric, size: 26),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Watch 6 ads today',
+                        style: TextStyle(color: _D.textHi, fontWeight: FontWeight.w700, fontSize: 14),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        claimed
+                            ? 'Done for today · comes back tomorrow'
+                            : 'Every rewarded ad counts. Claim +${AdPacingService.dailyAdChallengeRewardBtc.toStringAsFixed(8)} BTC at 6/6.',
+                        style: const TextStyle(color: _D.textMid, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: frac,
+                minHeight: 8,
+                backgroundColor: _D.cardBord,
+                color: claimed ? _D.green : _D.electric,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '$progress / $target ads today',
+              style: const TextStyle(color: _D.textMid, fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _ActionBtn(
+                    label: ad.loadingRewarded ? '…' : 'Watch ad',
+                    accent: _D.electric,
+                    enabled: !claimed && !ad.loadingRewarded,
+                    onTap: () => _watch(context),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _ActionBtn(
+                    label: claimed ? 'Claimed' : (canClaim ? 'Claim' : 'Locked'),
+                    accent: _D.green,
+                    enabled: canClaim,
+                    onTap: () async {
+                      final ok = await pacing.claimDailyAdChallenge();
+                      if (ok) {
+                        await game.grantDirectBtc(AdPacingService.dailyAdChallengeRewardBtc);
+                        if (context.mounted) {
+                          _toast(
+                            context,
+                            '+${AdPacingService.dailyAdChallengeRewardBtc.toStringAsFixed(8)} BTC',
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _watch(BuildContext context) async {
+    if (adCfg.useCustomTab && adCfg.customTabUrl.isNotEmpty) {
+      await pacing.markRewardedShown();
+      if (context.mounted) _toast(context, 'Ad counted · ${pacing.dailyAdChallengeProgress}/${AdPacingService.dailyAdChallengeTarget}');
+      await adCfg.openCustomTab(adCfg.customTabUrl);
+      return;
+    }
+    final canShow = await pacing.canShowRewarded();
+    if (!canShow) {
+      if (context.mounted) {
+        _toast(context, 'Wait ${pacing.rewardedCooldownLeft().inSeconds}s before next ad.');
+      }
+      return;
+    }
+    final shown = await ad.showRewarded(onEarned: () {});
+    if (!context.mounted) return;
+    if (shown) {
+      await pacing.markRewardedShown();
+      _toast(
+        context,
+        'Ad counted · ${pacing.dailyAdChallengeProgress}/${AdPacingService.dailyAdChallengeTarget}',
+      );
+    } else {
+      _toast(context, ad.lastError ?? 'Ad not ready');
+    }
+  }
+}
+
 // ─── Mini-game (tap challenge) card ───────────────────────────────────────────
 class _MiniGameCard extends StatelessWidget {
   const _MiniGameCard();
@@ -465,12 +625,12 @@ class _MiniGameCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Tap challenge',
+                  'Hash burst',
                   style: TextStyle(color: _D.textHi, fontWeight: FontWeight.w700, fontSize: 14),
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'Tap ${MiniGameService.tapTarget}x in ${MiniGameService.tapTimeSec}s · +${MiniGameService.rewardBtc.toStringAsFixed(5)} BTC · ${mini.playsLeft} plays left',
+                  'Land ${MiniGameService.tapTarget} hashes in ${MiniGameService.tapTimeSec}s · +${MiniGameService.rewardBtc.toStringAsFixed(8)} BTC · ${mini.playsLeft} left today',
                   style: const TextStyle(color: _D.textMid, fontSize: 12),
                 ),
               ],

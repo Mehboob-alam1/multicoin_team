@@ -10,6 +10,8 @@ class AdPacingService extends ChangeNotifier {
   static const _dailyAppOpenCountKey = 'ads_daily_app_open_count';
   static const _navTransitionsKey = 'ads_nav_transitions';
   static const _rewardedWatchedCountKey = 'ads_rewarded_watched_total';
+  static const _dailyRewardedCountKey = 'ads_daily_rewarded_count';
+  static const _dailyAdChallengeClaimedKey = 'ads_daily_ad_challenge_claimed';
 
   static const _interstitialCooldown = Duration(minutes: 3);
   static const _appOpenCooldown = Duration(minutes: 20);
@@ -17,6 +19,8 @@ class AdPacingService extends ChangeNotifier {
   static const _maxInterstitialPerDay = 10;
   static const _maxAppOpenPerDay = 4;
   static const _interstitialEveryNTransitions = 1;
+  static const dailyAdChallengeTarget = 6;
+  static const dailyAdChallengeRewardBtc = 0.000006;
 
   DateTime? _lastInterstitialAt;
   DateTime? _lastAppOpenAt;
@@ -26,9 +30,19 @@ class AdPacingService extends ChangeNotifier {
   int _navTransitions = 0;
   String _dailyDate = '';
   int _rewardedWatchedCount = 0;
+  int _dailyRewardedCount = 0;
+  bool _dailyAdChallengeClaimed = false;
 
   int get dailyInterstitialCount => _dailyInterstitialCount;
   int get rewardedAdsWatchedCount => _rewardedWatchedCount;
+  int get dailyRewardedCount => _dailyRewardedCount;
+  int get dailyAdChallengeProgress =>
+      _dailyRewardedCount.clamp(0, dailyAdChallengeTarget);
+  bool get dailyAdChallengeClaimed => _dailyAdChallengeClaimed;
+  bool get dailyAdChallengeComplete =>
+      _dailyRewardedCount >= dailyAdChallengeTarget;
+  bool get canClaimDailyAdChallenge =>
+      dailyAdChallengeComplete && !_dailyAdChallengeClaimed;
   int get dailyAppOpenCount => _dailyAppOpenCount;
   DateTime? get lastRewardedAt => _lastRewardedAt;
 
@@ -45,6 +59,8 @@ class AdPacingService extends ChangeNotifier {
     if (openMs is int) _lastAppOpenAt = DateTime.fromMillisecondsSinceEpoch(openMs);
     if (rewardMs is int) _lastRewardedAt = DateTime.fromMillisecondsSinceEpoch(rewardMs);
     _rewardedWatchedCount = (LocalFeatureStore.get(_rewardedWatchedCountKey, 0) as num).toInt();
+    _dailyRewardedCount = (LocalFeatureStore.get(_dailyRewardedCountKey, 0) as num).toInt();
+    _dailyAdChallengeClaimed = LocalFeatureStore.get(_dailyAdChallengeClaimedKey, false) == true;
     await _rolloverIfNeeded();
     notifyListeners();
   }
@@ -104,11 +120,23 @@ class AdPacingService extends ChangeNotifier {
   }
 
   Future<void> markRewardedShown() async {
+    await _rolloverIfNeeded();
     _lastRewardedAt = DateTime.now();
     _rewardedWatchedCount += 1;
+    _dailyRewardedCount += 1;
     await LocalFeatureStore.set(_lastRewardedMsKey, _lastRewardedAt!.millisecondsSinceEpoch);
     await LocalFeatureStore.set(_rewardedWatchedCountKey, _rewardedWatchedCount);
+    await LocalFeatureStore.set(_dailyRewardedCountKey, _dailyRewardedCount);
     notifyListeners();
+  }
+
+  Future<bool> claimDailyAdChallenge() async {
+    await _rolloverIfNeeded();
+    if (!canClaimDailyAdChallenge) return false;
+    _dailyAdChallengeClaimed = true;
+    await LocalFeatureStore.set(_dailyAdChallengeClaimedKey, true);
+    notifyListeners();
+    return true;
   }
 
   Future<void> _rolloverIfNeeded() async {
@@ -118,10 +146,14 @@ class AdPacingService extends ChangeNotifier {
     _dailyInterstitialCount = 0;
     _dailyAppOpenCount = 0;
     _navTransitions = 0;
+    _dailyRewardedCount = 0;
+    _dailyAdChallengeClaimed = false;
     await LocalFeatureStore.set(_dailyDateKey, _dailyDate);
     await LocalFeatureStore.set(_dailyInterstitialCountKey, _dailyInterstitialCount);
     await LocalFeatureStore.set(_dailyAppOpenCountKey, _dailyAppOpenCount);
     await LocalFeatureStore.set(_navTransitionsKey, _navTransitions);
+    await LocalFeatureStore.set(_dailyRewardedCountKey, 0);
+    await LocalFeatureStore.set(_dailyAdChallengeClaimedKey, false);
   }
 
   String _todayKey() {

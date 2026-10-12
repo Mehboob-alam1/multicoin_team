@@ -9,18 +9,15 @@ import '../services/auth_service.dart';
 import '../services/game_state_service.dart';
 import '../services/iap_service.dart';
 
-// ─── Design tokens (same as app) ───────────────────────────────────────────────
 class _D {
   static const bg       = Color(0xFFF7F8FA);
-  static const surface  = Color(0xFFFFFFFF);
   static const card     = Color(0xFFFFFFFF);
   static const cardBord = Color(0xFFE2E8F0);
   static const gold     = Color(0xFFF59E0B);
-  static const electric = Color(0xFF0EA5E9);
+  static const goldDark = Color(0xFFD97706);
   static const purple   = Color(0xFFA855F7);
   static const textHi   = Color(0xFF0D0F12);
   static const textMid  = Color(0xFF6B7280);
-  static const textLow  = Color(0xFF9CA3AF);
 }
 
 class PremiumOfferScreen extends StatefulWidget {
@@ -36,94 +33,113 @@ class _PremiumOfferScreenState extends State<PremiumOfferScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final auth = context.read<AuthService>();
       final game = context.read<GameStateService>();
+      final iap = context.read<IapService>();
       final user = auth.currentUser;
       if (user != null) {
         game.setUserId(user.uid);
         game.setDisplayName(user.displayName ?? user.email ?? 'Miner');
-        game.load();
+        await game.load();
+        if (!mounted) return;
+        if (game.isPremiumActive) {
+          _goHome(context);
+          return;
+        }
       }
+      if (iap.products.isEmpty) iap.init();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final game = context.watch<GameStateService>();
-    final iap  = context.watch<IapService>();
+    final iap = context.watch<IapService>();
+    final yearly = ShopProducts.premiumPlans.firstWhere((p) => p.id == 'premium_yearly');
+    final monthly = ShopProducts.premiumPlans.firstWhere((p) => p.id == 'premium_monthly');
 
     return Scaffold(
       backgroundColor: _D.bg,
       body: Stack(
         children: [
           Positioned(
-            top: -80,
-            right: -60,
-            child: _Blob(color: _D.gold.withValues(alpha: 0.06), size: 320),
+            top: -100,
+            right: -40,
+            child: _Blob(color: _D.gold.withValues(alpha: 0.10), size: 340),
           ),
           Positioned(
-            bottom: 120,
-            left: -80,
-            child: _Blob(color: _D.purple.withValues(alpha: 0.05), size: 280),
+            bottom: 40,
+            left: -90,
+            child: _Blob(color: _D.purple.withValues(alpha: 0.08), size: 300),
           ),
           SafeArea(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── Skip at top ─────────────────────────────────────────────
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
+                      const Spacer(),
                       TextButton(
                         onPressed: () => _goHome(context),
                         style: TextButton.styleFrom(
                           foregroundColor: _D.textMid,
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: const Text('Skip', style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: AppTheme.fontFamily,
-                        )),
+                        child: const Text(
+                          'Skip',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: AppTheme.fontFamily,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-
-                // ── Hero: encourage premium ──────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-                  child: Column(
+                Expanded(
+                  child: ListView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: _D.purple.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: _D.purple.withValues(alpha: 0.25)),
+                      Center(
+                        child: Container(
+                          width: 84,
+                          height: 84,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFFFBBF24), Color(0xFFA855F7)],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _D.purple.withValues(alpha: 0.28),
+                                blurRadius: 24,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 42),
                         ),
-                        child: const Icon(Icons.workspace_premium_rounded, color: _D.purple, size: 48),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 18),
                       const Text(
-                        'Unlock your full mining power',
+                        'Mine 1.5× faster',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: _D.textHi,
-                          fontSize: 22,
+                          fontSize: 26,
                           fontWeight: FontWeight.w800,
                           fontFamily: AppTheme.fontFamily,
-                          letterSpacing: 0.2,
+                          height: 1.15,
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Go Premium for 1.5× mining rate, exclusive rigs, no ads, and VIP badge. Start mining faster today.',
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Choose a plan to unlock full mining power.\nYou can skip and start for free.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: _D.textMid,
@@ -132,30 +148,45 @@ class _PremiumOfferScreenState extends State<PremiumOfferScreen> {
                           fontFamily: AppTheme.fontFamily,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-
-                // ── Plans list ──────────────────────────────────────────────
-                Expanded(
-                  child: ListView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                    children: [
-                      ...ShopProducts.premiumPlans.map((plan) {
-                        final storeProduct = iap.getProduct(plan.id);
-                        final priceStr     = storeProduct?.price ?? plan.price;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _PlanCard(
-                            plan: plan,
-                            priceStr: priceStr,
-                            iapLoading: iap.loading,
-                            iapAvail: iap.available && storeProduct != null,
-                            onSubscribe: () => _subscribe(context, plan),
+                      const SizedBox(height: 22),
+                      ...const [
+                        _PerkRow(icon: Icons.speed_rounded, text: '1.5× mining on every rig'),
+                        _PerkRow(icon: Icons.block_rounded, text: 'Remove all ads'),
+                        _PerkRow(icon: Icons.memory_rounded, text: 'Exclusive premium rigs'),
+                        _PerkRow(icon: Icons.verified_rounded, text: 'VIP badge on your profile'),
+                      ],
+                      const SizedBox(height: 20),
+                      _PlanPickCard(
+                        plan: yearly,
+                        priceStr: iap.getProduct(yearly.googleProductId)?.price ?? yearly.price,
+                        featured: true,
+                        badge: 'BEST VALUE · SAVE 50%',
+                        iapLoading: iap.loading,
+                        playReady: iap.isGoogleProductReady(yearly.googleProductId),
+                        onSubscribe: () => _subscribe(context, yearly),
+                      ),
+                      const SizedBox(height: 12),
+                      _PlanPickCard(
+                        plan: monthly,
+                        priceStr: iap.getProduct(monthly.googleProductId)?.price ?? monthly.price,
+                        featured: false,
+                        badge: null,
+                        iapLoading: iap.loading,
+                        playReady: iap.isGoogleProductReady(monthly.googleProductId),
+                        onSubscribe: () => _subscribe(context, monthly),
+                      ),
+                      const SizedBox(height: 16),
+                      TextButton(
+                        onPressed: () => _goHome(context),
+                        child: const Text(
+                          'Continue without a plan',
+                          style: TextStyle(
+                            color: _D.textMid,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: AppTheme.fontFamily,
                           ),
-                        );
-                      }),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -173,23 +204,12 @@ class _PremiumOfferScreenState extends State<PremiumOfferScreen> {
 
   Future<void> _subscribe(BuildContext context, PremiumPlan plan) async {
     final iap = context.read<IapService>();
-    final game = context.read<GameStateService>();
-    final useStore = iap.available && iap.getProduct(plan.id) != null;
-    if (useStore) {
-      final success = await iap.buySubscription(plan.id);
-      if (!context.mounted) return;
-      if (success) {
-        _toast(context, 'Complete in the store. Premium activates when done.');
-        _goHome(context);
-      } else {
-        _toast(context, iap.error ?? 'Purchase failed');
-      }
-      return;
-    }
-    await game.activatePremium(plan.id, plan.durationDays);
-    if (context.mounted) {
-      _toast(context, '⭐ ${plan.name} activated!');
-      _goHome(context);
+    final success = await iap.buySubscription(plan.googleProductId);
+    if (!context.mounted) return;
+    if (success) {
+      _toast(context, 'Complete in Google Play. Premium activates when the purchase finishes.');
+    } else {
+      _toast(context, iap.error ?? 'Google Play subscription unavailable. Check Play Console IDs.');
     }
   }
 
@@ -206,67 +226,111 @@ class _PremiumOfferScreenState extends State<PremiumOfferScreen> {
   }
 }
 
-class _Blob extends StatelessWidget {
-  final Color color;
-  final double size;
-  const _Blob({required this.color, required this.size});
+class _PerkRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _PerkRow({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-        ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: _D.gold.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: _D.goldDark, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: _D.textHi,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                fontFamily: AppTheme.fontFamily,
+              ),
+            ),
+          ),
+          const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 18),
+        ],
       ),
     );
   }
 }
 
-class _PlanCard extends StatelessWidget {
+class _PlanPickCard extends StatelessWidget {
   final PremiumPlan plan;
   final String priceStr;
+  final bool featured;
+  final String? badge;
   final bool iapLoading;
-  final bool iapAvail;
+  final bool playReady;
   final VoidCallback onSubscribe;
 
-  const _PlanCard({
+  const _PlanPickCard({
     required this.plan,
     required this.priceStr,
+    required this.featured,
+    required this.badge,
     required this.iapLoading,
-    required this.iapAvail,
+    required this.playReady,
     required this.onSubscribe,
   });
 
   @override
   Widget build(BuildContext context) {
+    final accent = featured ? _D.gold : _D.purple;
     return Container(
       decoration: BoxDecoration(
         color: _D.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _D.cardBord),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: featured ? _D.gold.withValues(alpha: 0.55) : _D.cardBord,
+          width: featured ? 1.6 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: featured ? 0.16 : 0.06),
+            blurRadius: featured ? 22 : 10,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: _D.purple.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(11),
-                    border: Border.all(color: _D.purple.withValues(alpha: 0.25)),
-                  ),
-                  child: const Icon(Icons.workspace_premium_rounded, color: _D.purple, size: 22),
+            if (badge != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)]),
+                  borderRadius: BorderRadius.circular(99),
                 ),
-                const SizedBox(width: 12),
+                child: Text(
+                  badge!,
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 10,
+                    letterSpacing: 0.6,
+                    fontFamily: AppTheme.fontFamily,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,68 +339,64 @@ class _PlanCard extends StatelessWidget {
                         plan.name,
                         style: const TextStyle(
                           color: _D.textHi,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
                           fontFamily: AppTheme.fontFamily,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         plan.description,
-                        style: const TextStyle(color: _D.textMid, fontSize: 12, fontFamily: AppTheme.fontFamily),
+                        style: const TextStyle(
+                          color: _D.textMid,
+                          fontSize: 12,
+                          fontFamily: AppTheme.fontFamily,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: _D.purple.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: _D.purple.withValues(alpha: 0.3)),
-                  ),
-                  child: Text(
-                    priceStr,
-                    style: const TextStyle(
-                      color: _D.purple,
-                      fontFamily: AppTheme.fontFamily,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
+                Text(
+                  priceStr,
+                  style: TextStyle(
+                    color: accent,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 20,
+                    fontFamily: AppTheme.fontFamily,
                   ),
                 ),
               ],
             ),
-            if (plan.benefits.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: plan.benefits.map((b) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _D.purple.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(7),
-                    border: Border.all(color: _D.purple.withValues(alpha: 0.2)),
-                  ),
-                  child: Text(
-                    b,
-                    style: const TextStyle(
-                      color: _D.purple,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: AppTheme.fontFamily,
-                    ),
-                  ),
-                )).toList(),
-              ),
-            ],
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
-              child: _SubscribeBtn(
-                label: iapLoading ? 'Loading…' : (iapAvail ? 'Subscribe' : 'Claim'),
-                onTap: onSubscribe,
+              height: 48,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: featured
+                      ? const LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFD97706)])
+                      : LinearGradient(colors: [_D.purple, _D.purple.withValues(alpha: 0.85)]),
+                ),
+                child: TextButton(
+                  onPressed: (iapLoading || !playReady) ? null : onSubscribe,
+                  style: TextButton.styleFrom(
+                    foregroundColor: featured ? Colors.black : Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: Text(
+                    iapLoading
+                        ? 'Loading Google Play…'
+                        : !playReady
+                            ? 'Unavailable in Play'
+                            : (featured ? 'Start yearly' : 'Start monthly'),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      fontFamily: AppTheme.fontFamily,
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -346,53 +406,19 @@ class _PlanCard extends StatelessWidget {
   }
 }
 
-class _SubscribeBtn extends StatefulWidget {
-  final String label;
-  final VoidCallback onTap;
-
-  const _SubscribeBtn({required this.label, required this.onTap});
-
-  @override
-  State<_SubscribeBtn> createState() => _SubscribeBtnState();
-}
-
-class _SubscribeBtnState extends State<_SubscribeBtn> {
-  bool _pressed = false;
+class _Blob extends StatelessWidget {
+  final Color color;
+  final double size;
+  const _Blob({required this.color, required this.size});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) { setState(() => _pressed = false); widget.onTap(); },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.97 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: Container(
-          height: 46,
-          decoration: BoxDecoration(
-            color: _D.purple.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _D.purple.withValues(alpha: 0.5)),
-            boxShadow: [BoxShadow(color: _D.purple.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 4))],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.star_rounded, color: _D.purple, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                widget.label,
-                style: const TextStyle(
-                  color: _D.purple,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                  fontFamily: AppTheme.fontFamily,
-                ),
-              ),
-            ],
-          ),
-        ),
+    return ImageFiltered(
+      imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       ),
     );
   }

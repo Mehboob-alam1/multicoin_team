@@ -32,6 +32,7 @@ import '../services/referral_service.dart';
 import '../services/smart_ad_manager.dart';
 import '../services/weekly_challenge_service.dart';
 import '../services/withdrawal_service.dart';
+import '../widgets/launch_offer_dialog.dart';
 import '../widgets/rate_app_dialog.dart';
 import '../theme/app_theme.dart';
 import 'dashboard_screen.dart';
@@ -116,6 +117,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _localSaveTicks = 0;
   double? _lastBalanceForGoals;
   bool _dailyBoostDialogShownThisSession = false;
+  bool _launchOfferShownThisSession = false;
   Timer? _timer;
   Timer? _syncTimer;
   @override
@@ -186,43 +188,64 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       context.read<SmartAdManager>().preloadAppOpen();
     });
     if (user != null) {
-      context.read<ReferralService>().load(user.uid);
+      final displayName = user.displayName ?? user.email ?? 'Miner';
+      context.read<ReferralService>().load(user.uid, displayName: displayName).then((_) async {
+        if (!mounted) return;
+        final referral = context.read<ReferralService>();
+        final game = context.read<GameStateService>();
+        final pending = await referral.consumePendingJoinBonuses();
+        if (!mounted) return;
+        if (pending > 0) {
+          await game.grantDirectBtc(pending * ReferralService.inviterBonusBtc);
+          if (!mounted) return;
+          final btc = (pending * ReferralService.inviterBonusBtc).toStringAsFixed(8);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+              pending == 1
+                  ? 'A friend joined with your code — +$btc BTC'
+                  : '$pending friends joined with your code — +$btc BTC',
+            ),
+          ));
+        }
+        final queued = await referral.takeQueuedJoinCode();
+        if (queued != null && queued.isNotEmpty) {
+          final result = await referral.applyReferral(
+            user.uid,
+            queued,
+            displayName: displayName,
+          );
+          if (result.ok) {
+            await game.grantDirectBtc(ReferralService.welcomeBonusBtc);
+            await referral.load(user.uid, displayName: displayName);
+          }
+        }
+      });
     }
 
     _maybeShowRateDialogLater();
+    _maybeShowLaunchOffer();
 
     final iap = context.read<IapService>();
     final analytics = context.read<AnalyticsService>();
-    iap.onPurchaseSuccess = (productId, isSubscription, durationDays) {
-      final p = ShopProducts.oneTimeById(productId);
-      final amount = p != null && p.price.startsWith('\$')
-          ? (double.tryParse(p.price.replaceFirst('\$', '').trim()) ?? 0)
+    iap.onPurchaseSuccess = (delivery) {
+      final p = ShopProducts.oneTimeById(delivery.productId);
+      final plan = ShopProducts.planById(delivery.productId);
+      final amountStr = p?.price ?? plan?.price ?? '';
+      final amount = amountStr.startsWith('\$')
+          ? (double.tryParse(amountStr.replaceFirst('\$', '').trim()) ?? 0)
           : 0.0;
       analytics.logPurchase(
         amount: amount,
         currency: 'USD',
-        productId: productId,
-        transactionId: '${DateTime.now().millisecondsSinceEpoch}',
+        productId: delivery.productId,
+        transactionId: delivery.purchaseId ?? '${DateTime.now().millisecondsSinceEpoch}',
       );
-      if (isSubscription) {
-        game.activatePremium(productId, durationDays);
-      } else {
-        if (!ShopProducts.isRepeatableFarmRigProduct(productId) &&
-            game.hasPurchasedOneTime(productId)) {
-          return;
+      game.fulfillGooglePlayPurchase(delivery).then((_) {
+        if (!mounted) return;
+        if (delivery.productId == 'season_pass') {
+          context.read<SeasonService>().unlockPremium();
         }
-        if (productId == 'season_pass') {
-          game.applyOneTimePurchase(productId: productId).then((_) {
-            if (mounted) context.read<SeasonService>().unlockPremium();
-          });
-          return;
-        }
-        if (p != null) {
-          if (productId == 'boost_2x_1h') game.activateBoost1h();
-          game.applyOneTimePurchase(
-              productId: productId, btcAmount: p.btcAmount, rigId: p.rigId);
-        }
-      }
+      });
     };
     iap.init();
 
@@ -397,6 +420,22 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  void _maybeShowLaunchOffer() {
+    Future.delayed(const Duration(milliseconds: 2200), () async {
+      if (!mounted || _launchOfferShownThisSession) return;
+      // Wait if another dialog (daily boost) is already up.
+      for (var i = 0; i < 12; i++) {
+        if (!mounted) return;
+        final route = ModalRoute.of(context);
+        if (route != null && route.isCurrent) break;
+        await Future.delayed(const Duration(milliseconds: 400));
+      }
+      if (!mounted || _launchOfferShownThisSession) return;
+      _launchOfferShownThisSession = true;
+      await LaunchOfferDialog.show(context);
+    });
   }
 
   void _maybeShowRateDialogLater() {

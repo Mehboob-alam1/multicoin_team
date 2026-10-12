@@ -411,12 +411,14 @@ class _OneTimeTab extends StatelessWidget {
       ],
       const SizedBox(height: 10),
 
-      ...ShopProducts.oneTime.map((product) {
-        final purchased    = game.hasPurchasedOneTime(product.id);
-        final storeProduct = iap.getProduct(product.id);
+      ...ShopProducts.shopPacks.map((product) {
+        final purchased    = !ShopProducts.isConsumableGoogleProduct(product.id) &&
+            game.hasPurchasedOneTime(product.id);
+        final storeProduct = iap.getProduct(product.googleProductId);
         final priceStr     = storeProduct?.price ?? product.price;
         final canBuyBtc    = product.isBtcPrice &&
             game.btcBalance >= _parseBtcPrice(product.price);
+        final playReady    = iap.isGoogleProductReady(product.googleProductId);
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 10),
@@ -424,8 +426,8 @@ class _OneTimeTab extends StatelessWidget {
             product:    product,
             priceStr:   priceStr,
             purchased:  purchased,
-            canBuy:     product.isBtcPrice ? canBuyBtc : true,
-            iapAvail:   iap.available && storeProduct != null,
+            canBuy:     product.isBtcPrice ? canBuyBtc : playReady,
+            iapAvail:   playReady,
             onPurchase: () => _onPurchase(context, product),
           ),
         );
@@ -450,20 +452,12 @@ class _OneTimeTab extends StatelessWidget {
       if (context.mounted) _toast(context, '⚡ 2× Boost active for 1 hour!');
       return;
     }
-    final useStore = iap.available && iap.getProduct(product.id) != null;
-    if (useStore) {
-      final success = await iap.buyProduct(product.id);
-      if (context.mounted) {
-        _toast(context, success
-            ? 'Complete purchase in the store.'
-            : (iap.error ?? 'Purchase failed'));
-      }
-      return;
+    final success = await iap.buyProduct(product.googleProductId);
+    if (context.mounted) {
+      _toast(context, success
+          ? 'Complete purchase in Google Play.'
+          : (iap.error ?? 'Google Play product unavailable. Check Play Console IDs.'));
     }
-    if (product.id == 'boost_2x_1h') game.activateBoost1h();
-    await game.applyOneTimePurchase(
-        productId: product.id, btcAmount: product.btcAmount, rigId: product.rigId);
-    if (context.mounted) _toast(context, product.id == 'boost_2x_1h' ? '⚡ 2× Boost active for 1 hour!' : 'Claimed: ${product.name}');
   }
 }
 
@@ -538,7 +532,7 @@ class _OneTimeCard extends StatelessWidget {
                 ? 'Owned'
                 : product.isBtcPrice
                 ? 'Buy with BTC'
-                : (iapAvail ? 'Buy' : 'Claim'),
+                : (iapAvail ? 'Buy with Google Play' : 'Unavailable in Play'),
             enabled: !purchased && canBuy,
             onTap: onPurchase,
             showCheck: purchased,
@@ -581,7 +575,7 @@ class _PremiumTab extends StatelessWidget {
         const SizedBox(height: 10),
 
         ...ShopProducts.premiumPlans.map((plan) {
-          final storeProduct = iap.getProduct(plan.id);
+          final storeProduct = iap.getProduct(plan.googleProductId);
           final priceStr     = storeProduct?.price ?? plan.price;
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
@@ -590,7 +584,7 @@ class _PremiumTab extends StatelessWidget {
               priceStr:    priceStr,
               isPremium:   isPremium,
               iapLoading:  iap.loading,
-              iapAvail:    iap.available && storeProduct != null,
+              iapAvail:    iap.isGoogleProductReady(plan.googleProductId),
               onSubscribe: () => _subscribe(context, plan),
             ),
           );
@@ -603,18 +597,12 @@ class _PremiumTab extends StatelessWidget {
       e != null ? '${e.day}/${e.month}/${e.year}' : '';
 
   Future<void> _subscribe(BuildContext context, PremiumPlan plan) async {
-    final useStore = iap.available && iap.getProduct(plan.id) != null;
-    if (useStore) {
-      final success = await iap.buySubscription(plan.id);
-      if (context.mounted) {
-        _toast(context, success
-            ? 'Complete in the store. Premium activates when done.'
-            : (iap.error ?? 'Purchase failed'));
-      }
-      return;
+    final success = await iap.buySubscription(plan.googleProductId);
+    if (context.mounted) {
+      _toast(context, success
+          ? 'Complete in Google Play. Premium activates when the purchase finishes.'
+          : (iap.error ?? 'Google Play subscription unavailable. Check Play Console IDs.'));
     }
-    await game.activatePremium(plan.id, plan.durationDays);
-    if (context.mounted) _toast(context, '⭐ ${plan.name} activated!');
   }
 }
 
@@ -751,7 +739,7 @@ class _PremiumPlanCard extends StatelessWidget {
                 ? 'Loading…'
                 : isPremium
                 ? 'Extend'
-                : (iapAvail ? 'Subscribe' : 'Claim'),
+                : (iapAvail ? 'Subscribe with Google Play' : 'Unavailable in Play'),
             onTap: onSubscribe,
           ),
         ),

@@ -19,6 +19,9 @@ class OneTimeProduct {
     this.rigId,
     this.icon = '🎁',
   });
+
+  /// Google Play Console in-app product ID (must match exactly).
+  String get googleProductId => id;
 }
 
 /// Premium subscription plan.
@@ -40,6 +43,9 @@ class PremiumPlan {
     required this.durationDays,
     this.benefits = const [],
   });
+
+  /// Google Play Console subscription product ID (must match exactly).
+  String get googleProductId => id;
 }
 
 class ShopProducts {
@@ -262,6 +268,32 @@ class ShopProducts {
   /// True for farm rig SKUs that can be bought more than once (each purchase adds a rig).
   static bool isRepeatableFarmRigProduct(String productId) =>
       farmRigIapProductIds.contains(productId);
+
+  /// Shop packs / boosts / upgrades — not farm rig SKUs (those are sold on Farm).
+  static List<OneTimeProduct> get shopPacks =>
+      oneTime.where((p) => !farmRigIapProductIds.contains(p.id)).toList();
+
+  /// Google Play one-time in-app product IDs (managed products).
+  static Set<String> get googlePlayOneTimeIds =>
+      {for (final p in oneTime) p.googleProductId};
+
+  /// Google Play subscription product IDs.
+  static Set<String> get googlePlaySubscriptionIds =>
+      {for (final p in premiumPlans) p.googleProductId};
+
+  /// All Google Play product IDs queried at billing init.
+  static Set<String> get googlePlayAllIds =>
+      {...googlePlayOneTimeIds, ...googlePlaySubscriptionIds};
+
+  /// Consumable in Play Console: farm rigs (repeatable) and the 1-hour boost.
+  static bool isConsumableGoogleProduct(String productId) =>
+      farmRigIapProductIds.contains(productId) || productId == 'boost_2x_1h';
+
+  static String iapCategory(String productId) {
+    if (googlePlaySubscriptionIds.contains(productId)) return 'premium';
+    if (farmRigIapProductIds.contains(productId)) return 'farm_rig';
+    return 'one_time';
+  }
 
   /// One-time IAP product for this rig on the Farm screen (USD only, not starter_pack).
   static OneTimeProduct? farmIapProductForRig(String rigId) {
