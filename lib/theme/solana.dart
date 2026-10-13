@@ -17,12 +17,15 @@ class Solana {
   static const Color surfaceRaised = Color(0xFF18181C);
   static const Color input = Color(0xFF1C1C22);
 
-  static const Color textHi = Color(0xF0FFFFFF);
-  static const Color textMid = Color(0xB8FFFFFF);
-  static const Color textLow = Color(0x73FFFFFF);
+  static const Color textHi = Color(0xFFF4F4F5);
+  static const Color textMid = Color(0xFFA1A1AA);
+  static const Color textLow = Color(0xFF71717A);
 
   static const Color border = Color(0x1FFFFFFF);
   static const Color borderStrong = Color(0x33FFFFFF);
+  static const Color hairline = Color(0x2DFFFFFF);
+  static const Color glassTop = Color(0xE61F1F26);
+  static const Color glassBot = Color(0xE6121216);
 
   static const Color danger = Color(0xFFFF4D6D);
   static const Color dangerBg = Color(0x22FF4D6D);
@@ -50,10 +53,10 @@ class Solana {
 
   static const List<Color> brandColors = [purple, green];
 
-  static const double radiusSm = 12;
-  static const double radiusMd = 16;
-  static const double radiusLg = 22;
-  static const double radiusXl = 28;
+  static const double radiusSm = 16;
+  static const double radiusMd = 20;
+  static const double radiusLg = 24;
+  static const double radiusXl = 32;
 
   static List<BoxShadow> glow({Color color = purple, double alpha = 0.35}) => [
         BoxShadow(

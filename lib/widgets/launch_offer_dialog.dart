@@ -182,7 +182,10 @@ class _LaunchOfferBodyState extends State<_LaunchOfferBody> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
       child: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: width),
+          constraints: BoxConstraints(
+            maxWidth: width,
+            maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+          ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(30),
             child: BackdropFilter(
@@ -190,17 +193,25 @@ class _LaunchOfferBodyState extends State<_LaunchOfferBody> {
               child: Container(
                 padding: const EdgeInsets.fromLTRB(22, 16, 22, 14),
                 decoration: BoxDecoration(
-                  color: const Color(0xF0111114),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xF21F1F26), Color(0xE6121216)],
+                  ),
                   borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: offer.border.withValues(alpha: 0.75)),
+                  border: Border.all(
+                    color: const Color(0x2DFFFFFF),
+                    width: 0.8,
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: offer.accent.withValues(alpha: 0.16),
+                      color: offer.accent.withValues(alpha: 0.22),
                       blurRadius: 34,
                       offset: const Offset(0, 16),
                     ),
                   ],
                 ),
+                child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -287,6 +298,7 @@ class _LaunchOfferBodyState extends State<_LaunchOfferBody> {
                       child: Text('Skip for now', style: _sg(size: 13, weight: FontWeight.w600, color: _D.textMid)),
                     ),
                   ],
+                ),
                 ),
               ),
             ),

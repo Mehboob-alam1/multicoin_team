@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../models/player_data.dart';
 import 'supabase_bootstrap.dart';
 
@@ -20,7 +22,10 @@ class FirebaseSyncService {
         'player_data': data.toJson(),
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
-    } catch (_) {}
+      debugPrint('Supabase players upsert ok uid=$uid');
+    } catch (e) {
+      debugPrint('Supabase players upsert failed: $e');
+    }
   }
 
   Future<PlayerData?> fetchPlayerData(String uid) async {

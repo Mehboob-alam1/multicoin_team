@@ -13,11 +13,11 @@ class SupabaseConfig {
     defaultValue: _anonFallback,
   );
 
-  /// Paste project URL, e.g. https://xxxx.supabase.co
-  static const _urlFallback = '';
+  /// Project URL only — no /rest/v1 suffix.
+  static const _urlFallback = 'https://pbsruiwuehcyrvnghxwa.supabase.co';
 
-  /// Paste the anon (public) key from Project Settings → API.
-  static const _anonFallback = '';
+  /// Publishable key (safe in the app). Never put the secret key here.
+  static const _anonFallback = 'sb_publishable_r6SF9l-Gfl-FFEBGCnvs2Q_5DkiTzlX';
 
   static bool get isConfigured =>
       url.startsWith('https://') && anonKey.isNotEmpty && anonKey != 'YOUR_ANON_KEY';

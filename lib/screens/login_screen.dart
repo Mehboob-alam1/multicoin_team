@@ -177,7 +177,10 @@ class _LoginScreenState extends State<LoginScreen>
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: AnimatedBuilder(
                 animation: _entryCtrl,
-                child: SizedBox(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: SizedBox(
                       height: size.height - 100,
                       child: Column(
                         children: [
@@ -360,6 +363,8 @@ class _LoginScreenState extends State<LoginScreen>
                         ],
                       ),
                     ),
+                  ),
+                ),
                 builder: (context, child) {
                   if (_entryCtrl.status == AnimationStatus.completed) {
                     return child!;
@@ -519,8 +524,10 @@ class _GradientButtonState extends State<_GradientButton> {
         ? () => setState(() => _isPressed = false)
         : null,
     onTap: widget.enabled && !widget.loading ? widget.onTap : null,
-    child: Transform.scale(
+    child: AnimatedScale(
       scale: _isPressed ? 0.96 : 1.0,
+      duration: const Duration(milliseconds: 110),
+      curve: Curves.easeOutBack,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Container(
@@ -622,8 +629,10 @@ class _OutlineButtonState extends State<_OutlineButton> {
         ? () => setState(() => _isPressed = false)
         : null,
     onTap: widget.enabled && !widget.loading ? widget.onTap : null,
-    child: Transform.scale(
+    child: AnimatedScale(
       scale: _isPressed ? 0.96 : 1.0,
+      duration: const Duration(milliseconds: 110),
+      curve: Curves.easeOutBack,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(

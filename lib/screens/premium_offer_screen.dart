@@ -40,7 +40,7 @@ class _PremiumOfferScreenState extends State<PremiumOfferScreen> {
       final user = auth.currentUser;
       if (user != null) {
         game.setUserId(user.uid);
-        game.setDisplayName(user.displayName ?? user.email ?? 'Miner');
+        game.setDisplayName(auth.displayNameOf(user));
         await game.load();
         if (!mounted) return;
         if (game.isPremiumActive) {
@@ -90,7 +90,10 @@ class _PremiumOfferScreenState extends State<PremiumOfferScreen> {
                   ),
                 ),
                 Expanded(
-                  child: ListView(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 560),
+                      child: ListView(
                     physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
                     children: [
@@ -102,15 +105,19 @@ class _PremiumOfferScreenState extends State<PremiumOfferScreen> {
                         ),
                       ),
                       const SizedBox(height: 18),
-                      const Text(
-                        'Mine 1.5× faster',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: _D.textHi,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          fontFamily: AppTheme.fontFamily,
-                          height: 1.15,
+                      ShaderMask(
+                        blendMode: BlendMode.srcIn,
+                        shaderCallback: (r) => Solana.brand.createShader(r),
+                        child: const Text(
+                          'Mine 1.5× faster',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            fontFamily: AppTheme.fontFamily,
+                            height: 1.15,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -164,6 +171,8 @@ class _PremiumOfferScreenState extends State<PremiumOfferScreen> {
                         ),
                       ),
                     ],
+                  ),
+                    ),
                   ),
                 ),
               ],
@@ -285,7 +294,7 @@ class _PlanPickCard extends StatelessWidget {
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
                     fontSize: 10,
-                    letterSpacing: 0.6,
+                    letterSpacing: 1.4,
                     fontFamily: AppTheme.fontFamily,
                   ),
                 ),

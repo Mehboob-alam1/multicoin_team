@@ -208,7 +208,7 @@ class _Header extends StatelessWidget {
                   children: [
                     Text('Solana News', style: _sg(size: 16, weight: FontWeight.w700, spacing: -0.3)),
                     const SizedBox(height: 2),
-                    Text('COINDESK', style: _sg(size: 9, weight: FontWeight.w700, color: _D.gold, spacing: 1.5)),
+                    Text('COINDESK', style: _sg(size: 9, weight: FontWeight.w700, color: _D.gold, spacing: 1.6)),
                   ],
                 ),
               ),
@@ -306,9 +306,13 @@ class _RoundButton extends StatelessWidget {
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: const Color(0xFF18181C),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xF21F1F26), Color(0xE6121216)],
+            ),
             borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: _D.line),
+            border: Border.all(color: const Color(0x2DFFFFFF), width: 0.8),
           ),
           child: Icon(icon, color: _D.textHi, size: 18),
         ),

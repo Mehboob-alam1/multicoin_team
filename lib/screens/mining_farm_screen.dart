@@ -63,7 +63,7 @@ TextStyle _mono({
   FontWeight weight = FontWeight.w600,
   Color color = _D.textHi,
 }) =>
-    GoogleFonts.jetBrainsMono(
+    GoogleFonts.spaceMono(
       fontSize: size,
       fontWeight: weight,
       color: color,
@@ -328,7 +328,13 @@ class MiningFarmScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('Mining Farm', style: _sg(size: 16, weight: FontWeight.w700, letterSpacing: -0.3)),
+                            ShaderMask(
+                              blendMode: BlendMode.srcIn,
+                              shaderCallback: (r) => const LinearGradient(
+                                colors: [Color(0xFF9945FF), Color(0xFF14F195)],
+                              ).createShader(r),
+                              child: Text('Mining Farm', style: _sg(size: 16, weight: FontWeight.w700, letterSpacing: -0.3, color: Colors.white)),
+                            ),
                             Text('VALIDATORS', style: _sg(size: 9, weight: FontWeight.w700, color: _D.gold, letterSpacing: 1.6)),
                           ],
                         ),
@@ -619,32 +625,35 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _StatTile(
-            icon: Icons.speed_rounded,
-            label: 'Hash power',
-            value: game.totalBtcPerMin.toStringAsFixed(8),
-            unit: 'SOL/min',
-            color: _D.green,
-            tint: _D.greenBg,
-            border: _D.greenBdr,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _StatTile(
+              icon: Icons.speed_rounded,
+              label: 'Hash power',
+              value: game.totalBtcPerMin.toStringAsFixed(8),
+              unit: 'SOL/min',
+              color: _D.green,
+              tint: _D.greenBg,
+              border: _D.greenBdr,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatTile(
-            icon: Icons.memory_rounded,
-            label: 'Installed',
-            value: '${game.ownedRigIds.length}',
-            unit: 'rigs',
-            color: _D.electric,
-            tint: _D.electricBg,
-            border: _D.electricBdr,
+          const SizedBox(width: 12),
+          Expanded(
+            child: _StatTile(
+              icon: Icons.memory_rounded,
+              label: 'Installed',
+              value: '${game.ownedRigIds.length}',
+              unit: 'rigs',
+              color: _D.electric,
+              tint: _D.electricBg,
+              border: _D.electricBdr,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -672,25 +681,31 @@ class _StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return _Glass(
       padding: const EdgeInsets.all(15),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: tint,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: border),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 132),
+        child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: tint,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: border),
+              ),
+              child: Icon(icon, color: color, size: 16),
             ),
-            child: Icon(icon, color: color, size: 16),
-          ),
-          const SizedBox(height: 12),
-          Text(label, style: _sg(size: 11, color: _D.textMid)),
-          const SizedBox(height: 3),
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: _mono(size: 13, color: color)),
-          Text(unit, style: _sg(size: 10, color: _D.textLow)),
-        ],
+            const SizedBox(height: 12),
+            Text(label, style: _sg(size: 11, color: _D.textMid)),
+            const SizedBox(height: 3),
+            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: _mono(size: 13, color: color)),
+            Text(unit, style: _sg(size: 10, color: _D.textLow)),
+          ],
+        ),
+        ),
       ),
     );
   }
@@ -1008,7 +1023,7 @@ class _Glass extends StatelessWidget {
   const _Glass({
     required this.child,
     this.padding = EdgeInsets.zero,
-    this.radius = 22,
+    this.radius = 24,
     this.tint,
     this.border,
     this.glow,
@@ -1017,14 +1032,59 @@ class _Glass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: padding,
       decoration: BoxDecoration(
-        color: tint ?? const Color(0xF218181C),
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: border ?? const Color(0x2EFFFFFF), width: 0.8),
-        boxShadow: glow,
+        boxShadow: glow ??
+            [
+              BoxShadow(
+                color: const Color(0xFF9945FF).withValues(alpha: 0.08),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+              ),
+            ],
       ),
-      child: child,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      tint ?? const Color(0xF21F1F26),
+                      const Color(0xE6121216),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(radius),
+                  border: Border.all(color: border ?? const Color(0x2DFFFFFF), width: 0.8),
+                ),
+              ),
+            ),
+            Padding(
+              padding: padding,
+              child: child,
+            ),
+            const Positioned(
+              top: 0,
+              left: 18,
+              right: 18,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0x00FFFFFF), Color(0x38FFFFFF), Color(0x00FFFFFF)],
+                    ),
+                  ),
+                  child: SizedBox(height: 1),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

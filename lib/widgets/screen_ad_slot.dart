@@ -14,11 +14,13 @@ class ScreenAdSlot extends StatefulWidget {
     super.key,
     this.title = 'Sponsored',
     this.bannerFallback = true,
+    this.allowNative = true,
     this.padding = EdgeInsets.zero,
   });
 
   final String title;
   final bool bannerFallback;
+  final bool allowNative;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -51,7 +53,7 @@ class _ScreenAdSlotState extends State<ScreenAdSlot> {
       return;
     }
 
-    if (cfg.nativeEnabled) {
+    if (widget.allowNative && cfg.nativeEnabled) {
       final pooled = ads.takeNativeIfReady();
       if (pooled != null && mounted) {
         setState(() => _native = pooled);

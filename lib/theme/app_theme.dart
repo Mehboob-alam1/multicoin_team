@@ -13,7 +13,7 @@ class AppTheme {
   static const Color cardBg = Solana.surfaceRaised;
   static const Color btcGold = Solana.purple;
 
-  static const String fontFamily = 'Plus Jakarta Sans';
+  static const String fontFamily = 'Space Grotesk';
 
   static const Color textPrimary = Solana.textHi;
   static const Color textSecondary = Solana.textMid;
@@ -23,7 +23,7 @@ class AppTheme {
   static const double pagePaddingV = 16;
   static const double sectionSpacing = 20;
   static const double cardSpacing = 12;
-  static const double cardRadius = 22;
+  static const double cardRadius = 24;
   static const double bottomNavHeight = 76;
   static const double bannerAdHeight = 50;
   static const ScrollPhysics pageScroll = AlwaysScrollableScrollPhysics();
@@ -43,11 +43,11 @@ class AppTheme {
       EdgeInsets.fromLTRB(pagePaddingH, pagePaddingV, pagePaddingH, pagePaddingV);
 
   static TextTheme get lightTextTheme =>
-      GoogleFonts.plusJakartaSansTextTheme(ThemeData.dark().textTheme);
+      GoogleFonts.spaceGroteskTextTheme(ThemeData.dark().textTheme);
   static TextTheme get darkTextTheme => lightTextTheme;
 
   static ThemeData get light {
-    final textTheme = GoogleFonts.plusJakartaSansTextTheme(
+    final textTheme = GoogleFonts.spaceGroteskTextTheme(
       ThemeData.dark().textTheme.copyWith(
         bodyLarge: const TextStyle(color: textPrimary),
         bodyMedium: const TextStyle(color: textPrimary),
@@ -63,7 +63,7 @@ class AppTheme {
           TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
         },
       ),
-      fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
+      fontFamily: GoogleFonts.spaceGrotesk().fontFamily,
       textTheme: textTheme,
       colorScheme: const ColorScheme.dark(
         primary: primary,
@@ -81,7 +81,7 @@ class AppTheme {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         systemOverlayStyle: SystemUiOverlayStyle.light,
-        titleTextStyle: GoogleFonts.plusJakartaSans(
+        titleTextStyle: GoogleFonts.spaceGrotesk(
           color: textPrimary,
           fontSize: 20,
           fontWeight: FontWeight.w600,
@@ -101,7 +101,7 @@ class AppTheme {
           backgroundColor: primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(

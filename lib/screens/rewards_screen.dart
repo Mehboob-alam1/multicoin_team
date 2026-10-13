@@ -55,7 +55,7 @@ TextStyle _mono({
   FontWeight weight = FontWeight.w600,
   Color color = _D.textHi,
 }) =>
-    GoogleFonts.jetBrainsMono(
+    GoogleFonts.spaceMono(
       fontSize: size,
       fontWeight: weight,
       color: color,
@@ -160,7 +160,13 @@ class RewardsScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('Rewards', style: _sg(size: 16, weight: FontWeight.w700, spacing: -0.3)),
+                            ShaderMask(
+                              blendMode: BlendMode.srcIn,
+                              shaderCallback: (r) => const LinearGradient(
+                                colors: [Color(0xFF9945FF), Color(0xFF14F195)],
+                              ).createShader(r),
+                              child: Text('Rewards', style: _sg(size: 16, weight: FontWeight.w700, spacing: -0.3, color: Colors.white)),
+                            ),
                             Text('DAILY VAULT', style: _sg(size: 9, weight: FontWeight.w700, color: _D.gold, spacing: 1.6)),
                           ],
                         ),
@@ -794,8 +800,8 @@ class _Glass extends StatelessWidget {
   const _Glass({
     required this.child,
     this.padding = const EdgeInsets.all(16),
-    this.radius = 22,
-    this.tint = const Color(0xB318181C),
+    this.radius = 24,
+    this.tint = const Color(0xF21F1F26),
     this.border = _D.line,
     this.glow,
   });
@@ -803,14 +809,52 @@ class _Glass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: padding,
       decoration: BoxDecoration(
-        color: tint.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: border, width: 0.8),
-        boxShadow: glow,
+        boxShadow: glow ??
+            [
+              BoxShadow(
+                color: const Color(0xFF9945FF).withValues(alpha: 0.08),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+              ),
+            ],
       ),
-      child: child,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Stack(
+          children: [
+            Container(
+              padding: padding,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [tint.withValues(alpha: 0.96), const Color(0xE6121216)],
+                ),
+                borderRadius: BorderRadius.circular(radius),
+                border: Border.all(color: border, width: 0.8),
+              ),
+              child: child,
+            ),
+            const Positioned(
+              top: 0,
+              left: 18,
+              right: 18,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0x00FFFFFF), Color(0x38FFFFFF), Color(0x00FFFFFF)],
+                    ),
+                  ),
+                  child: SizedBox(height: 1),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

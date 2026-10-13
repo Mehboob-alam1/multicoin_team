@@ -53,36 +53,10 @@ TextStyle _mono({
   FontWeight weight = FontWeight.w700,
   Color color = _D.textHi,
 }) =>
-    GoogleFonts.jetBrainsMono(fontSize: size, fontWeight: weight, color: color, height: 1.1);
+    GoogleFonts.spaceMono(fontSize: size, fontWeight: weight, color: color, height: 1.1, letterSpacing: -0.3);
 
-class _Tab {
-  final String label;
-  final IconData icon;
-  final Color accent;
-  const _Tab(this.label, this.icon, this.accent);
-}
-
-const _tabs = [
-  _Tab('Rigs', Icons.memory_rounded, _D.electric),
-  _Tab('One-time', Icons.card_giftcard_rounded, _D.gold),
-  _Tab('Premium', Icons.workspace_premium_rounded, _D.violet),
-];
-
-class ShopScreen extends StatefulWidget {
+class ShopScreen extends StatelessWidget {
   const ShopScreen({super.key});
-
-  @override
-  State<ShopScreen> createState() => _ShopScreenState();
-}
-
-class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateMixin {
-  late final TabController _tabsController = TabController(length: 3, vsync: this);
-
-  @override
-  void dispose() {
-    _tabsController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,29 +74,25 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
             const Positioned.fill(child: CustomPaint(painter: _MeshPainter())),
             SafeArea(
               bottom: false,
-              child: Column(
-                children: [
-                  _ShopAppBar(game: game, iap: iap),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                    child: _HeroCard(game: game),
-                  ),
-                  if (adCfg.shouldShowSdkAds && !game.isPremiumActive)
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
-                      child: ScreenAdSlot(title: 'Shop offer'),
+              child: CustomScrollView(
+                physics: AppTheme.pageScroll,
+                slivers: [
+                  SliverToBoxAdapter(child: _ShopAppBar(game: game, iap: iap)),
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      8,
+                      20,
+                      AppTheme.pageBottomPadding(context),
                     ),
-                  const SizedBox(height: 12),
-                  _ShopTabBar(controller: _tabsController),
-                  const SizedBox(height: 6),
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabsController,
-                      children: [
-                        _RigsTab(game: game, events: events),
-                        _OneTimeTab(game: game, iap: iap, adCfg: adCfg),
-                        _PremiumTab(game: game, iap: iap),
-                      ],
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _OneTimeSection(game: game, iap: iap, adCfg: adCfg),
+                        const SizedBox(height: 28),
+                        _PremiumSection(game: game, iap: iap),
+                        const SizedBox(height: 28),
+                        _RigsSection(game: game, events: events),
+                      ]),
                     ),
                   ),
                 ],
@@ -161,7 +131,13 @@ class _ShopAppBar extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Shop', style: _sg(size: 16, weight: FontWeight.w700, spacing: -0.3)),
+              ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (r) => const LinearGradient(
+                  colors: [Color(0xFF9945FF), Color(0xFF14F195)],
+                ).createShader(r),
+                child: Text('Shop', style: _sg(size: 16, weight: FontWeight.w700, spacing: -0.3, color: Colors.white)),
+              ),
               Text('UPGRADES', style: _sg(size: 9, weight: FontWeight.w700, color: _D.gold, spacing: 1.6)),
             ],
           ),
@@ -240,67 +216,16 @@ class _HeroCard extends StatelessWidget {
   }
 }
 
-class _ShopTabBar extends StatelessWidget {
-  final TabController controller;
-  const _ShopTabBar({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (_, __) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: _Glass(
-          padding: const EdgeInsets.all(4),
-          radius: 18,
-          child: Row(
-            children: List.generate(_tabs.length, (index) {
-              final tab = _tabs[index];
-              final active = controller.index == index;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    controller.animateTo(index);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: active ? tab.accent.withValues(alpha: 0.14) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: active ? tab.accent.withValues(alpha: 0.35) : Colors.transparent),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(tab.icon, color: active ? tab.accent : _D.textLow, size: 15),
-                        const SizedBox(width: 5),
-                        Text(tab.label, style: _sg(size: 12, weight: FontWeight.w700, color: active ? tab.accent : _D.textLow)),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RigsTab extends StatelessWidget {
+class _RigsSection extends StatelessWidget {
   final GameStateService game;
   final EventService events;
 
-  const _RigsTab({required this.game, required this.events});
+  const _RigsSection({required this.game, required this.events});
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      physics: AppTheme.pageScroll,
-      padding: EdgeInsets.fromLTRB(20, 12, 20, AppTheme.pageBottomPadding(context)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (events.rigDiscount > 0) ...[
           _Notice(
@@ -334,18 +259,17 @@ class _RigsTab extends StatelessWidget {
   }
 }
 
-class _OneTimeTab extends StatelessWidget {
+class _OneTimeSection extends StatelessWidget {
   final GameStateService game;
   final IapService iap;
   final AdRemoteConfigService adCfg;
 
-  const _OneTimeTab({required this.game, required this.iap, required this.adCfg});
+  const _OneTimeSection({required this.game, required this.iap, required this.adCfg});
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      physics: AppTheme.pageScroll,
-      padding: EdgeInsets.fromLTRB(20, 12, 20, AppTheme.pageBottomPadding(context)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (iap.error != null) ...[
           _Notice(icon: Icons.error_outline_rounded, color: _D.orange, text: iap.error!),
@@ -367,25 +291,62 @@ class _OneTimeTab extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 12),
-        ...ShopProducts.shopPacks.map((product) {
-          final purchased = !ShopProducts.isConsumableGoogleProduct(product.id) && game.hasPurchasedOneTime(product.id);
-          final storeProduct = iap.getProduct(product.googleProductId);
-          final price = storeProduct?.price ?? product.price;
-          final playReady = iap.isGoogleProductReady(product.googleProductId);
-          final canBuy = product.isBtcPrice ? game.btcBalance >= _parseBtcPrice(product.price) : playReady;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _OneTimeCard(
-              product: product,
-              price: price,
-              purchased: purchased,
-              canBuy: canBuy,
-              playReady: playReady,
-              onPurchase: () => _purchase(context, product),
-            ),
-          );
-        }),
+        ..._packCardsWithAds(context),
       ],
+    );
+  }
+
+  List<Widget> _packCardsWithAds(BuildContext context) {
+    final packs = ShopProducts.shopPacks;
+    final showAds = adCfg.shouldShowSdkAds && !game.isPremiumActive;
+    final out = <Widget>[];
+    var shownBanner = false;
+    for (var i = 0; i < packs.length; i++) {
+      out.add(_packCard(context, packs[i]));
+      if (showAds && i == 1) {
+        out.add(const SizedBox(height: 4));
+        out.add(const ScreenAdSlot(
+          title: 'Shop native',
+          bannerFallback: false,
+        ));
+        out.add(const SizedBox(height: 12));
+      }
+      if (showAds && i == 4) {
+        out.add(const SizedBox(height: 4));
+        out.add(const ScreenAdSlot(
+          title: 'Shop banner',
+          allowNative: false,
+        ));
+        out.add(const SizedBox(height: 12));
+        shownBanner = true;
+      }
+    }
+    if (showAds && !shownBanner) {
+      out.add(const SizedBox(height: 4));
+      out.add(const ScreenAdSlot(
+        title: 'Shop banner',
+        allowNative: false,
+      ));
+    }
+    return out;
+  }
+
+  Widget _packCard(BuildContext context, OneTimeProduct product) {
+    final purchased = !ShopProducts.isConsumableGoogleProduct(product.id) && game.hasPurchasedOneTime(product.id);
+    final storeProduct = iap.getProduct(product.googleProductId);
+    final price = storeProduct?.price ?? product.price;
+    final playReady = iap.isGoogleProductReady(product.googleProductId);
+    final canBuy = product.isBtcPrice ? game.btcBalance >= _parseBtcPrice(product.price) : playReady;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: _OneTimeCard(
+        product: product,
+        price: price,
+        purchased: purchased,
+        canBuy: canBuy,
+        playReady: playReady,
+        onPurchase: () => _purchase(context, product),
+      ),
     );
   }
 
@@ -478,19 +439,18 @@ class _OneTimeCard extends StatelessWidget {
   }
 }
 
-class _PremiumTab extends StatelessWidget {
+class _PremiumSection extends StatelessWidget {
   final GameStateService game;
   final IapService iap;
 
-  const _PremiumTab({required this.game, required this.iap});
+  const _PremiumSection({required this.game, required this.iap});
 
   @override
   Widget build(BuildContext context) {
     final premium = game.isPremiumActive;
     final expiry = game.premiumExpiry;
-    return ListView(
-      physics: AppTheme.pageScroll,
-      padding: EdgeInsets.fromLTRB(20, 12, 20, AppTheme.pageBottomPadding(context)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (premium)
           _Glass(
@@ -780,21 +740,59 @@ class _Glass extends StatelessWidget {
   const _Glass({
     required this.child,
     this.padding = const EdgeInsets.all(15),
-    this.radius = 22,
-    this.tint = const Color(0xB318181C),
+    this.radius = 24,
+    this.tint = const Color(0xF21F1F26),
     this.border = _D.line,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: padding,
       decoration: BoxDecoration(
-        color: tint.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: border, width: 0.8),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF9945FF).withValues(alpha: 0.08),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
-      child: child,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Stack(
+          children: [
+            Container(
+              padding: padding,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [tint.withValues(alpha: 0.96), const Color(0xE6121216)],
+                ),
+                borderRadius: BorderRadius.circular(radius),
+                border: Border.all(color: border, width: 0.8),
+              ),
+              child: child,
+            ),
+            const Positioned(
+              top: 0,
+              left: 18,
+              right: 18,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0x00FFFFFF), Color(0x38FFFFFF), Color(0x00FFFFFF)],
+                    ),
+                  ),
+                  child: SizedBox(height: 1),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

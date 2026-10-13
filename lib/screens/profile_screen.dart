@@ -20,6 +20,7 @@ import '../services/withdrawal_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/rate_app_dialog.dart';
 import '../widgets/screen_ad_slot.dart';
+import '../widgets/user_circle_avatar.dart';
 import 'legal_document_screen.dart';
 
 class _D {
@@ -66,7 +67,7 @@ TextStyle _mono({
   FontWeight weight = FontWeight.w600,
   Color color = _D.textHi,
 }) =>
-    GoogleFonts.jetBrainsMono(
+    GoogleFonts.spaceMono(
       fontSize: size,
       fontWeight: weight,
       color: color,
@@ -87,7 +88,7 @@ class ProfileScreen extends StatelessWidget {
     final btcPrice = context.watch<BtcPriceService>();
     final user = auth.currentUser;
     final isGuest = user?.isAnonymous == true;
-    final displayName = user?.displayName ?? (isGuest ? 'Guest Miner' : 'Miner');
+    final displayName = auth.displayNameOf(user);
 
     if (referral.myCode == null || referral.myCode!.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -132,7 +133,13 @@ class ProfileScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('Profile', style: _sg(size: 16, weight: FontWeight.w700, spacing: -0.3)),
+                        ShaderMask(
+                          blendMode: BlendMode.srcIn,
+                          shaderCallback: (r) => const LinearGradient(
+                            colors: [Color(0xFF9945FF), Color(0xFF14F195)],
+                          ).createShader(r),
+                          child: Text('Profile', style: _sg(size: 16, weight: FontWeight.w700, spacing: -0.3, color: Colors.white)),
+                        ),
                         Text('ACCOUNT', style: _sg(size: 9, weight: FontWeight.w700, color: _D.gold, spacing: 1.6)),
                       ],
                     ),
@@ -144,6 +151,7 @@ class ProfileScreen extends StatelessWidget {
                         _AvatarHero(
                           user: user,
                           displayName: displayName,
+                          photoUrl: auth.photoUrlOf(user),
                           isGuest: isGuest,
                           isPremium: game.isPremiumActive,
                         ),
@@ -195,12 +203,14 @@ class ProfileScreen extends StatelessWidget {
 class _AvatarHero extends StatelessWidget {
   final dynamic user;
   final String displayName;
+  final String? photoUrl;
   final bool isGuest;
   final bool isPremium;
 
   const _AvatarHero({
     required this.user,
     required this.displayName,
+    required this.photoUrl,
     required this.isGuest,
     required this.isPremium,
   });
@@ -222,20 +232,10 @@ class _AvatarHero extends StatelessWidget {
                 boxShadow: [BoxShadow(color: _D.gold.withValues(alpha: 0.22), blurRadius: 28)],
               ),
             ),
-            Container(
-              width: 102,
-              height: 102,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF111114),
-                image: user?.photoURL != null
-                    ? DecorationImage(image: NetworkImage(user!.photoURL!), fit: BoxFit.cover)
-                    : null,
-                border: Border.all(color: _D.bg, width: 3),
-              ),
-              child: user?.photoURL == null
-                  ? const Icon(Icons.person_rounded, size: 46, color: _D.gold)
-                  : null,
+            UserCircleAvatar(
+              name: displayName,
+              photoUrl: photoUrl,
+              size: 102,
             ),
             const Positioned(
               right: 8,
@@ -942,7 +942,7 @@ class _EnterReferralCodeState extends State<_EnterReferralCode> {
       return;
     }
     setState(() => _loading = true);
-    final name = widget.auth.currentUser?.displayName ?? widget.auth.currentUser?.email ?? 'Miner';
+    final name = widget.auth.displayNameOf(widget.auth.currentUser);
     final result = await widget.referral.applyReferral(uid, code, displayName: name);
     if (result.ok) {
       await widget.game.grantDirectBtc(ReferralService.welcomeBonusBtc);
@@ -1218,20 +1218,58 @@ class _Glass extends StatelessWidget {
   const _Glass({
     required this.child,
     this.padding = const EdgeInsets.all(16),
-    this.tint = const Color(0xB318181C),
+    this.tint = const Color(0xF21F1F26),
     this.border = _D.line,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: padding,
       decoration: BoxDecoration(
-        color: tint.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: border, width: 0.8),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF9945FF).withValues(alpha: 0.08),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
-      child: child,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          children: [
+            Container(
+              padding: padding,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [tint.withValues(alpha: 0.96), const Color(0xE6121216)],
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: border, width: 0.8),
+              ),
+              child: child,
+            ),
+            const Positioned(
+              top: 0,
+              left: 18,
+              right: 18,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0x00FFFFFF), Color(0x38FFFFFF), Color(0x00FFFFFF)],
+                    ),
+                  ),
+                  child: SizedBox(height: 1),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

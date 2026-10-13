@@ -104,6 +104,18 @@ alter table public.referral_invites enable row level security;
 alter table public.events enable row level security;
 alter table public.fcm_tokens enable row level security;
 
+drop policy if exists "players_own" on public.players;
+drop policy if exists "leaderboard_read" on public.leaderboard;
+drop policy if exists "leaderboard_own_write" on public.leaderboard;
+drop policy if exists "leaderboard_own_update" on public.leaderboard;
+drop policy if exists "purchases_own" on public.purchases;
+drop policy if exists "referrals_own" on public.referrals;
+drop policy if exists "referral_codes_read" on public.referral_codes;
+drop policy if exists "referral_codes_own_write" on public.referral_codes;
+drop policy if exists "invites_as_inviter" on public.referral_invites;
+drop policy if exists "events_read" on public.events;
+drop policy if exists "fcm_own" on public.fcm_tokens;
+
 create policy "players_own" on public.players
   for all using (uid = (auth.jwt()->>'sub'))
   with check (uid = (auth.jwt()->>'sub'));

@@ -128,26 +128,61 @@ class _GlassContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = radius ?? _HT.r24;
     return Container(
-          decoration: BoxDecoration(
-            color: tintColor?.withOpacity(0.82) ?? _HT.surface.withOpacity(0.82),
-            borderRadius: radius ?? _HT.r20,
-            border: Border.all(color: _HT.glassBorder, width: 0.8),
-            boxShadow: shadows ?? [
+      decoration: BoxDecoration(
+        borderRadius: r,
+        boxShadow: shadows ??
+            [
               BoxShadow(
-                color: Colors.white.withOpacity(0.06),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
+                color: const Color(0xFF9945FF).withOpacity(0.10),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
               ),
             ],
-          ),
-          padding: padding,
-          child: child,
+      ),
+      child: ClipRRect(
+        borderRadius: r,
+        child: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    tintColor?.withOpacity(0.88) ?? const Color(0xF21F1F26),
+                    const Color(0xE6121216),
+                  ],
+                ),
+                borderRadius: r,
+                border: Border.all(color: _HT.glassBorder, width: 0.8),
+              ),
+              padding: padding,
+              child: child,
+            ),
+            const Positioned(
+              top: 0,
+              left: 18,
+              right: 18,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Color(0x00FFFFFF),
+                        Color(0x38FFFFFF),
+                        Color(0x00FFFFFF),
+                      ],
+                    ),
+                  ),
+                  child: SizedBox(height: 1),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

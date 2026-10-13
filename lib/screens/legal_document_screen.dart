@@ -51,8 +51,23 @@ class LegalDocumentScreen extends StatelessWidget {
                 gradient: RadialGradient(
                   center: Alignment(-0.8, -1.0),
                   radius: 1.1,
-                  colors: [Color(0x3320476B), Color(0x0008080A)],
+                  colors: [Color(0x339945FF), Color(0x0008080A)],
                 ),
+              ),
+            ),
+          ),
+          const Positioned(
+            bottom: -90,
+            right: -60,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [Color(0x2414F195), Color(0x0008080A)],
+                  ),
+                ),
+                child: SizedBox(width: 280, height: 280),
               ),
             ),
           ),

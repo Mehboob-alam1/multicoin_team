@@ -419,13 +419,19 @@ class _AppBar extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'LEADERBOARD',
-              style: _label(
-                size: 16,
-                weight: FontWeight.w800,
-                color: _D.textHi,
-                letterSpacing: 1.2,
+            ShaderMask(
+              blendMode: BlendMode.srcIn,
+              shaderCallback: (r) => const LinearGradient(
+                colors: [_D.gold, _D.green],
+              ).createShader(r),
+              child: Text(
+                'LEADERBOARD',
+                style: _label(
+                  size: 16,
+                  weight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: 1.4,
+                ),
               ),
             ),
             const SizedBox(height: 2),
@@ -705,7 +711,11 @@ class _ProfileCard extends StatelessWidget {
       child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
           decoration: BoxDecoration(
-            color: const Color(0xF218181C),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xF21F1F26), Color(0xE6121216)],
+            ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isCurrentUser
@@ -859,9 +869,16 @@ class _EntryRow extends StatelessWidget {
       child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
           decoration: BoxDecoration(
-            color: isCurrentUser
-                ? _D.electric.withOpacity(0.12)
-                : const Color(0xF218181C),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isCurrentUser
+                  ? [
+                      _D.electric.withOpacity(0.16),
+                      const Color(0xE6121216),
+                    ]
+                  : const [Color(0xF21F1F26), Color(0xE6121216)],
+            ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isCurrentUser

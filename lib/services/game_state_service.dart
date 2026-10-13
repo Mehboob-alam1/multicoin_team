@@ -302,6 +302,9 @@ class GameStateService extends ChangeNotifier {
       if (!hadLocalData || !fetchFresh) {
         unawaited(_mergeRemoteAfterLocal(hadLocalData));
       }
+      if (!_isFresh(prefs, _lastRemoteSyncPrefsKey, _minRemoteSyncInterval)) {
+        unawaited(_persist(forceRemote: false, markDirty: true));
+      }
     }
   }
 

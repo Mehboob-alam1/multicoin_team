@@ -41,13 +41,13 @@ class HomeTheme {
   static const double lg = 20;
   static const double md = 14;
   static const double sm = 8;
-  static const double cardRadius = 22;
+  static const double cardRadius = 24;
 
   static TextStyle monoNumber({
     double fontSize = 14,
     FontWeight weight = FontWeight.w600,
   }) {
-    return GoogleFonts.jetBrainsMono(
+    return GoogleFonts.spaceMono(
       fontSize: fontSize,
       fontWeight: weight,
       letterSpacing: -0.3,

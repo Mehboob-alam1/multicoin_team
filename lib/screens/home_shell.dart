@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -53,15 +54,23 @@ class _D {
   static const surface  = Color(0xFF18181C);
   static const card     = Color(0xFF18181C);
   static const cardBord = Color(0x1FFFFFFF);
-  static const gold     = Color(0xFF9945FF);
+  static const gold     = Color(0xFF9945FF); // Solana purple
   static const electric = Color(0xFF14F195);
-  static const green    = Color(0xFF14F195);
+  static const green    = Color(0xFF14F195); // Solana green
   static const textHi   = Color(0xFFF4F4F5);
   static const textMid  = Color(0xFFA1A1AA);
   static const textLow  = Color(0xFF71717A);
 
   // Glass
   static const glassBorder = Color(0x2DFFFFFF);
+  static const glassFillTop = Color(0xE61F1F26);
+  static const glassFillBot = Color(0xE6121216);
+
+  static const brand = LinearGradient(
+    colors: [Color(0xFF9945FF), Color(0xFF14F195)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 }
 
 // ─── Typography ───────────────────────────────────────────────────────────────
@@ -171,7 +180,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     final auth = context.read<AuthService>();
     final user = auth.currentUser;
     game.setUserId(user?.uid);
-    game.setDisplayName(user?.displayName ?? (user?.email ?? 'Miner'));
+    game.setDisplayName(auth.displayNameOf(user));
     if (game.isLoaded) {
       unawaited(game.applyIdleEarningsOnResume());
     } else {
@@ -240,7 +249,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       unawaited(context.read<SmartAdManager>().preloadAll());
     });
     if (user != null) {
-      final displayName = user.displayName ?? user.email ?? 'Miner';
+      final displayName = context.read<AuthService>().displayNameOf(user);
       context.read<ReferralService>().load(
         user.uid,
         displayName: displayName,
@@ -402,104 +411,23 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   void _showDailyBoostDialog(DailyBoostService daily) {
     showDialog<void>(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withOpacity(0.62),
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding:
+        const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
         insetAnimationDuration: const Duration(milliseconds: 300),
         insetAnimationCurve: Curves.easeOutBack,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: Container(
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: const Color(0xF218181C),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: _D.glassBorder, width: 0.8),
-                boxShadow: [
-                  BoxShadow(
-                    color: _D.gold.withOpacity(0.2),
-                    blurRadius: 40,
-                    spreadRadius: -4,
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 24,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Animated icon
-                  TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0, end: 1),
-                    duration: const Duration(milliseconds: 600),
-                    curve: Curves.easeOutBack,
-                    builder: (ctx, val, _) => Transform.scale(
-                      scale: val,
-                      child: Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _D.gold.withOpacity(0.15),
-                          border: Border.all(
-                              color: _D.gold.withOpacity(0.4), width: 1.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _D.gold.withOpacity(0.25),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
-                            )
-                          ],
-                        ),
-                        child: const Icon(Icons.bolt_rounded,
-                            color: _D.gold, size: 36),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Daily Boost Ready',
-                    style: _label(
-                      size: 20,
-                      weight: FontWeight.w700,
-                      color: _D.textHi,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Claim your 2× mining speed boost for 30 minutes from the Dashboard.',
-                    textAlign: TextAlign.center,
-                    style: _label(
-                      size: 13,
-                      color: _D.textMid,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  Row(children: [
-                    Expanded(
-                      child: _OutlineBtn(
-                        label: 'Later',
-                        onTap: () => Navigator.pop(ctx),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: _GoldBtn(
-                        label: 'Claim now',
-                        onTap: () async {
-                          await daily.claim();
-                          if (ctx.mounted) Navigator.pop(ctx);
-                        },
-                      ),
-                    ),
-                  ]),
-                ],
-              ),
-            ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: _DailyBoostCard(
+            onLater: () => Navigator.pop(ctx),
+            onClaim: () async {
+              await daily.claim();
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+          ),
         ),
       ),
     );
@@ -549,19 +477,44 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       return const _LoadingScreen();
     }
 
+    final stack = IndexedStack(
+      index: _index,
+      children: [
+        for (var i = 0; i < pages.length; i++)
+          TickerMode(
+            enabled: i == _index,
+            child: RepaintBoundary(child: pages[i]),
+          ),
+      ],
+    );
+
+    // Responsive: tablets / landscape / desktop get a side rail,
+    // phones get the floating glass bar.
+    final wide = MediaQuery.sizeOf(context).width >= 840;
+
+    if (wide) {
+      return Scaffold(
+        backgroundColor: _D.bg,
+        body: Row(
+          children: [
+            _SideRail(currentIndex: _index, onTap: _onTabTapped),
+            Expanded(
+              child: Column(
+                children: [
+                  Expanded(child: stack),
+                  const RemoteConfigBanner(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: _D.bg,
       extendBody: false,
-      body: IndexedStack(
-        index: _index,
-        children: [
-          for (var i = 0; i < pages.length; i++)
-            TickerMode(
-              enabled: i == _index,
-              child: RepaintBoundary(child: pages[i]),
-            ),
-        ],
-      ),
+      body: stack,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -645,7 +598,7 @@ class _LoadingScreen extends StatefulWidget {
 class _LoadingScreenState extends State<_LoadingScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(seconds: 2))
+      vsync: this, duration: const Duration(milliseconds: 2400))
     ..repeat(reverse: true);
 
   @override
@@ -655,45 +608,163 @@ class _LoadingScreenState extends State<_LoadingScreen>
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: _D.bg,
-    body: Stack(
-      children: [
-        const SolanaMeshBackground(intensity: 0.22),
-        Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedBuilder(
-                animation: _c,
-                builder: (_, __) => SolanaMark(size: 84, pulse: _c.value),
-              ),
-              const SizedBox(height: 28),
-              Text(
-                'Solana Mining Tycoon',
-                style: _label(
-                  size: 22,
-                  weight: FontWeight.w800,
-                  color: _D.textHi,
-                  letterSpacing: -0.3,
+  Widget build(BuildContext context) {
+    final w = MediaQuery.sizeOf(context).width;
+    final markSize = (w * 0.22).clamp(76.0, 120.0);
+
+    return Scaffold(
+      backgroundColor: _D.bg,
+      body: Stack(
+        children: [
+          const SolanaMeshBackground(intensity: 0.22),
+          // Soft vignette for depth
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, -0.15),
+                    radius: 1.0,
+                    colors: [
+                      Colors.transparent,
+                      _D.bg.withOpacity(0.85),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 10),
-              Text(
-                'Loading your validators…',
-                style: _label(size: 13, color: _D.textMid),
-              ),
-              const SizedBox(height: 28),
-              const SolanaShimmerBar(width: 160),
-            ],
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+          SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedBuilder(
+                        animation: _c,
+                        builder: (_, __) => SizedBox(
+                          width: markSize * 2.1,
+                          height: markSize * 2.1,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Breathing glow rings
+                              for (var i = 0; i < 3; i++)
+                                Container(
+                                  width: markSize * (1.25 + i * 0.32) +
+                                      _c.value * 10,
+                                  height: markSize * (1.25 + i * 0.32) +
+                                      _c.value * 10,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: (i.isEven
+                                          ? _D.gold
+                                          : _D.green)
+                                          .withOpacity(
+                                          (0.20 - i * 0.05) *
+                                              (0.6 + _c.value * 0.4)),
+                                      width: 1,
+                                    ),
+                                  ),
+                                ),
+                              Container(
+                                width: markSize * 1.5,
+                                height: markSize * 1.5,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: _D.gold
+                                          .withOpacity(0.18 + _c.value * 0.14),
+                                      blurRadius: 60,
+                                      spreadRadius: 4,
+                                    ),
+                                    BoxShadow(
+                                      color: _D.green
+                                          .withOpacity(0.08 + _c.value * 0.08),
+                                      blurRadius: 80,
+                                      offset: const Offset(0, 16),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SolanaMark(size: markSize, pulse: _c.value),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ShaderMask(
+                        blendMode: BlendMode.srcIn,
+                        shaderCallback: (r) => _D.brand.createShader(r),
+                        child: Text(
+                          'Solana Mining Tycoon',
+                          textAlign: TextAlign.center,
+                          style: _label(
+                            size: 26,
+                            weight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: -0.6,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Loading your validators…',
+                        textAlign: TextAlign.center,
+                        style: _label(size: 14, color: _D.textMid),
+                      ),
+                      const SizedBox(height: 32),
+                      const SolanaShimmerBar(width: 180),
+                      const SizedBox(height: 22),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(color: _D.glassBorder, width: 0.8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: _D.green,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'SYNCING NETWORK',
+                              style: _mono(
+                                size: 10,
+                                color: _D.textMid,
+                                weight: FontWeight.w700,
+                              ).copyWith(letterSpacing: 1.4),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// ─── Floating nav bar ─────────────────────────────────────────────────────────
+// ─── Floating glass nav bar (phones) ──────────────────────────────────────────
 class _FloatingNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -702,34 +773,110 @@ class _FloatingNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final mq = MediaQuery.of(context);
+    final compact = mq.size.width < 360;
+    final barHeight = compact ? 64.0 : 70.0;
+    final accent = _navItems[currentIndex].accent;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomInset + 14),
-      child: Container(
-        height: 72,
-        decoration: BoxDecoration(
-          color: const Color(0xF218181C),
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: _D.glassBorder, width: 0.8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.35),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+      padding: EdgeInsets.fromLTRB(
+          compact ? 12 : 18, 0, compact ? 12 : 18, mq.padding.bottom + 12),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOutCubic,
+            height: barHeight,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: accent.withOpacity(0.16),
+                  blurRadius: 32,
+                  spreadRadius: -6,
+                  offset: const Offset(0, 8),
+                ),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Row(
-          children: List.generate(_navItems.length, (i) {
-            return Expanded(
-              child: _NavTile(
-                item: _navItems[i],
-                selected: currentIndex == i,
-                onTap: () => onTap(i),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [_D.glassFillTop, _D.glassFillBot],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: _D.glassBorder, width: 0.8),
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, c) {
+                      final tileW = c.maxWidth / _navItems.length;
+                      return Stack(
+                        children: [
+                          // Sliding highlight pill
+                          AnimatedPositioned(
+                            duration: const Duration(milliseconds: 380),
+                            curve: Curves.easeOutCubic,
+                            left: currentIndex * tileW + 5,
+                            top: 7,
+                            bottom: 7,
+                            width: tileW - 10,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 380),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(21),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    accent.withOpacity(0.22),
+                                    accent.withOpacity(0.07),
+                                  ],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ),
+                                border: Border.all(
+                                  color: accent.withOpacity(0.35),
+                                  width: 0.8,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: accent.withOpacity(0.20),
+                                    blurRadius: 18,
+                                    spreadRadius: -2,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Row(
+                            children: List.generate(_navItems.length, (i) {
+                              return Expanded(
+                                child: _NavTile(
+                                  item: _navItems[i],
+                                  selected: currentIndex == i,
+                                  compact: compact,
+                                  onTap: () => onTap(i),
+                                ),
+                              );
+                            }),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
               ),
-            );
-          }),
+            ),
+          ),
         ),
       ),
     );
@@ -737,48 +884,429 @@ class _FloatingNavBar extends StatelessWidget {
 }
 
 // ─── Nav tile ─────────────────────────────────────────────────────────────────
-class _NavTile extends StatefulWidget {
+class _NavTile extends StatelessWidget {
+  final _NavItem item;
+  final bool selected;
+  final bool compact;
+  final VoidCallback onTap;
+
+  const _NavTile({
+    required this.item,
+    required this.selected,
+    required this.compact,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AnimatedSlide(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutBack,
+            offset: selected ? const Offset(0, -0.06) : Offset.zero,
+            child: AnimatedScale(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutBack,
+              scale: selected ? 1.12 : 1.0,
+              child: ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (r) => (selected
+                    ? LinearGradient(
+                  colors: [item.accent, item.accent.withOpacity(0.75)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+                    : const LinearGradient(
+                    colors: [_D.textLow, _D.textLow]))
+                    .createShader(r),
+                child: Icon(
+                  selected ? item.activeIcon : item.icon,
+                  color: Colors.white,
+                  size: compact ? 21 : 23,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 220),
+            style: _label(
+              size: compact ? 9.5 : 10.5,
+              weight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected ? item.accent : _D.textLow,
+              letterSpacing: selected ? 0.3 : -0.1,
+            ),
+            child: Text(
+              item.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Side rail (tablet / desktop) ─────────────────────────────────────────────
+class _SideRail extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+
+  const _SideRail({required this.currentIndex, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 96,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xF21F1F26), Color(0xE60B0B0D)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        border: Border(
+          right: BorderSide(color: Color(0x2DFFFFFF), width: 0.8),
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: 18),
+            SolanaMark(size: 42, pulse: 0),
+            const SizedBox(height: 26),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: List.generate(_navItems.length, (i) {
+                    return _RailTile(
+                      item: _navItems[i],
+                      selected: currentIndex == i,
+                      onTap: () => onTap(i),
+                    );
+                  }),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RailTile extends StatelessWidget {
   final _NavItem item;
   final bool selected;
   final VoidCallback onTap;
 
-  const _NavTile({
+  const _RailTile({
     required this.item,
     required this.selected,
     required this.onTap,
   });
 
   @override
-  State<_NavTile> createState() => _NavTileState();
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+        width: 72,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: selected
+              ? LinearGradient(
+            colors: [
+              item.accent.withOpacity(0.22),
+              item.accent.withOpacity(0.06),
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          )
+              : null,
+          border: Border.all(
+            color: selected
+                ? item.accent.withOpacity(0.35)
+                : Colors.transparent,
+            width: 0.8,
+          ),
+          boxShadow: selected
+              ? [
+            BoxShadow(
+              color: item.accent.withOpacity(0.18),
+              blurRadius: 18,
+              spreadRadius: -2,
+            ),
+          ]
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? item.activeIcon : item.icon,
+              color: selected ? item.accent : _D.textLow,
+              size: 24,
+            ),
+            const SizedBox(height: 5),
+            Text(
+              item.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: _label(
+                size: 10.5,
+                weight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? item.accent : _D.textLow,
+                letterSpacing: selected ? 0.3 : -0.1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _NavTileState extends State<_NavTile>
+// ─── Daily boost card ─────────────────────────────────────────────────────────
+class _DailyBoostCard extends StatelessWidget {
+  final VoidCallback onLater;
+  final Future<void> Function() onClaim;
+
+  const _DailyBoostCard({required this.onLater, required this.onClaim});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(32),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xF51F1F26), Color(0xF5121216)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(color: _D.glassBorder, width: 0.8),
+            boxShadow: [
+              BoxShadow(
+                color: _D.gold.withOpacity(0.28),
+                blurRadius: 60,
+                spreadRadius: -6,
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.4),
+                blurRadius: 30,
+                offset: const Offset(0, 16),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              // Ambient colour orbs
+              Positioned(
+                top: -70,
+                left: -50,
+                child: _orb(_D.gold, 190, 0.28),
+              ),
+              Positioned(
+                bottom: -80,
+                right: -50,
+                child: _orb(_D.green, 190, 0.16),
+              ),
+              // Top highlight hairline
+              Positioned(
+                top: 0,
+                left: 40,
+                right: 40,
+                child: Container(
+                  height: 1,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [
+                      Colors.transparent,
+                      Colors.white.withOpacity(0.35),
+                      Colors.transparent,
+                    ]),
+                  ),
+                ),
+              ),
+              SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 30, 24, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const _HaloIcon(),
+                      const SizedBox(height: 22),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: _D.green.withOpacity(0.10),
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(
+                              color: _D.green.withOpacity(0.35), width: 0.8),
+                        ),
+                        child: Text(
+                          'DAILY REWARD',
+                          style: _mono(
+                            size: 10,
+                            color: _D.green,
+                            weight: FontWeight.w700,
+                          ).copyWith(letterSpacing: 1.6),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      ShaderMask(
+                        blendMode: BlendMode.srcIn,
+                        shaderCallback: (r) => _D.brand.createShader(r),
+                        child: Text(
+                          'Daily Boost Ready',
+                          textAlign: TextAlign.center,
+                          style: _label(
+                            size: 26,
+                            weight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: -0.6,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Claim your 2× mining speed boost for 30 minutes from the Dashboard.',
+                        textAlign: TextAlign.center,
+                        style: _label(
+                          size: 14,
+                          color: _D.textMid,
+                          letterSpacing: -0.2,
+                        ).copyWith(height: 1.45),
+                      ),
+                      const SizedBox(height: 20),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: const [
+                          _StatChip(
+                              icon: Icons.bolt_rounded,
+                              text: '2× speed',
+                              color: _D.gold),
+                          _StatChip(
+                              icon: Icons.timer_rounded,
+                              text: '30 min',
+                              color: _D.green),
+                          _StatChip(
+                              icon: Icons.card_giftcard_rounded,
+                              text: 'Free',
+                              color: _D.gold),
+                        ],
+                      ),
+                      const SizedBox(height: 26),
+                      Row(children: [
+                        Expanded(
+                          flex: 4,
+                          child: _OutlineBtn(
+                            label: 'Later',
+                            onTap: onLater,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 6,
+                          child: _GoldBtn(
+                            label: 'Claim now',
+                            icon: Icons.bolt_rounded,
+                            onTap: () => onClaim(),
+                          ),
+                        ),
+                      ]),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _orb(Color color, double size, double opacity) => IgnorePointer(
+    child: Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [color.withOpacity(opacity), Colors.transparent],
+        ),
+      ),
+    ),
+  );
+}
+
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  const _StatChip({
+    required this.icon,
+    required this.text,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.04),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: _D.glassBorder, width: 0.8),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: color),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: _label(
+            size: 12.5,
+            weight: FontWeight.w700,
+            color: _D.textHi,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ─── Animated halo icon ───────────────────────────────────────────────────────
+class _HaloIcon extends StatefulWidget {
+  const _HaloIcon();
+
+  @override
+  State<_HaloIcon> createState() => _HaloIconState();
+}
+
+class _HaloIconState extends State<_HaloIcon>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 280),
-  );
-  late final Animation<double> _scale = CurvedAnimation(
-    parent: _c,
-    curve: Curves.easeOutBack,
-  );
-
-  @override
-  void didUpdateWidget(_NavTile old) {
-    super.didUpdateWidget(old);
-    if (widget.selected && !old.selected) {
-      _c.forward(from: 0);
-    }
-    if (!widget.selected && old.selected) {
-      _c.reverse();
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.selected) _c.value = 1;
-  }
+      vsync: this, duration: const Duration(milliseconds: 2200))
+    ..repeat();
 
   @override
   void dispose() {
@@ -787,74 +1315,82 @@ class _NavTileState extends State<_NavTile>
   }
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: widget.onTap,
-    behavior: HitTestBehavior.opaque,
-    child: AnimatedBuilder(
-      animation: _scale,
-      builder: (_, __) => Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Active indicator
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 280),
-            width: widget.selected ? 24 : 0,
-            height: 3.5,
-            margin: const EdgeInsets.only(bottom: 6),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  widget.item.accent,
-                  widget.item.accent.withOpacity(0.6),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(99),
-              boxShadow: widget.selected
-                  ? [
-                BoxShadow(
-                  color: widget.item.accent.withOpacity(0.4),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 650),
+      curve: Curves.easeOutBack,
+      builder: (ctx, val, child) =>
+          Transform.scale(scale: val.clamp(0.0, 1.2), child: child),
+      child: SizedBox(
+        width: 120,
+        height: 120,
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (_, __) {
+            final t = _c.value;
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                // Expanding ripple
+                Container(
+                  width: 76 + 44 * t,
+                  height: 76 + 44 * t,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _D.gold.withOpacity(0.35 * (1 - t)),
+                      width: 1.5,
+                    ),
+                  ),
                 ),
-              ]
-                  : null,
-            ),
-          ),
-          Transform.scale(
-            scale: widget.selected ? 0.9 + 0.1 * _scale.value : 1.0,
-            child: Icon(
-              widget.selected ? widget.item.activeIcon : widget.item.icon,
-              color: widget.selected ? widget.item.accent : _D.textLow,
-              size: 22,
-            ),
-          ),
-          const SizedBox(height: 4),
-          AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 200),
-            style: _label(
-              size: 10,
-              weight: widget.selected ? FontWeight.w700 : FontWeight.w500,
-              color: widget.selected ? widget.item.accent : _D.textLow,
-              letterSpacing: widget.selected ? 0.6 : -0.1,
-            ),
-            child: Text(
-              widget.item.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
+                // Core
+                Container(
+                  width: 78,
+                  height: 78,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        _D.gold.withOpacity(0.30),
+                        _D.green.withOpacity(0.14),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    border: Border.all(
+                        color: Colors.white.withOpacity(0.22), width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _D.gold.withOpacity(0.35),
+                        blurRadius: 28,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (r) => _D.brand.createShader(r),
+                    child: const Icon(Icons.bolt_rounded,
+                        color: Colors.white, size: 42),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 // ─── Dialog buttons ───────────────────────────────────────────────────────────
 class _GoldBtn extends StatefulWidget {
   final String label;
+  final IconData? icon;
   final VoidCallback onTap;
 
-  const _GoldBtn({required this.label, required this.onTap});
+  const _GoldBtn({required this.label, required this.onTap, this.icon});
 
   @override
   State<_GoldBtn> createState() => _GoldBtnState();
@@ -868,40 +1404,81 @@ class _GoldBtnState extends State<_GoldBtn> {
     onTapDown: (_) => setState(() => _isPressed = true),
     onTapUp: (_) => setState(() => _isPressed = false),
     onTapCancel: () => setState(() => _isPressed = false),
-    onTap: widget.onTap,
-    child: Transform.scale(
-      scale: _isPressed ? 0.95 : 1.0,
+    onTap: () {
+      HapticFeedback.mediumImpact();
+      widget.onTap();
+    },
+    child: AnimatedScale(
+      scale: _isPressed ? 0.96 : 1.0,
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 15),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF9945FF), Color(0xFF14F195)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(14),
+          gradient: _D.brand,
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF9945FF).withOpacity(0.3),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
+              color: const Color(0xFF9945FF)
+                  .withOpacity(_isPressed ? 0.25 : 0.45),
+              blurRadius: 22,
+              offset: const Offset(0, 8),
             ),
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: const Color(0xFF14F195).withOpacity(0.15),
+              blurRadius: 24,
+              offset: const Offset(6, 10),
             ),
           ],
         ),
-        alignment: Alignment.center,
-        child: Text(
-          widget.label,
-          style: _label(
-            size: 14,
-            weight: FontWeight.w700,
-            color: Colors.white,
-            letterSpacing: -0.2,
-          ),
+        child: Stack(
+          children: [
+            // Glossy top sheen
+            Positioned(
+              top: -15,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: Container(
+                  height: 22,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.22),
+                        Colors.transparent,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.icon != null) ...[
+                    Icon(widget.icon, size: 18, color: Colors.white),
+                    const SizedBox(width: 6),
+                  ],
+                  Flexible(
+                    child: Text(
+                      widget.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: _label(
+                        size: 15,
+                        weight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     ),
@@ -927,28 +1504,25 @@ class _OutlineBtnState extends State<_OutlineBtn> {
     onTapUp: (_) => setState(() => _isPressed = false),
     onTapCancel: () => setState(() => _isPressed = false),
     onTap: widget.onTap,
-    child: Transform.scale(
-      scale: _isPressed ? 0.95 : 1.0,
+    child: AnimatedScale(
+      scale: _isPressed ? 0.96 : 1.0,
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 15),
         decoration: BoxDecoration(
-          color: _D.surface.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(14),
+          color: Colors.white.withOpacity(_isPressed ? 0.08 : 0.04),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: _D.glassBorder, width: 0.8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         alignment: Alignment.center,
         child: Text(
           widget.label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: _label(
-            size: 14,
-            weight: FontWeight.w700,
+            size: 15,
+            weight: FontWeight.w600,
             color: _D.textMid,
             letterSpacing: -0.2,
           ),

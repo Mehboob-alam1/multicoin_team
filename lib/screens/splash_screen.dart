@@ -123,7 +123,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     final user = auth.currentUser;
     if (user != null) {
       game.setUserId(user.uid);
-      game.setDisplayName(user.displayName ?? user.email ?? 'Miner');
+      game.setDisplayName(auth.displayNameOf(user));
       try {
         await game.load();
       } catch (_) {}
@@ -194,10 +194,18 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                               style: _sg(size: 12, weight: FontWeight.w700, color: _D.goldText, spacing: 5.4),
                             ),
                             const SizedBox(height: 8),
-                            Text(
-                              'Mining Tycoon',
-                              textAlign: TextAlign.center,
-                              style: _sg(size: 30, weight: FontWeight.w700, spacing: -0.9),
+                            ShaderMask(
+                              blendMode: BlendMode.srcIn,
+                              shaderCallback: (r) => const LinearGradient(
+                                colors: [Color(0xFF9945FF), Color(0xFF14F195)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ).createShader(r),
+                              child: Text(
+                                'Mining Tycoon',
+                                textAlign: TextAlign.center,
+                                style: _sg(size: 30, weight: FontWeight.w700, spacing: -0.9, color: Colors.white),
+                              ),
                             ),
                             const SizedBox(height: 10),
                             Text(
@@ -205,7 +213,20 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                               textAlign: TextAlign.center,
                               style: _sg(size: 14, color: _D.textMid),
                             ),
-                            const SizedBox(height: 36),
+                            const SizedBox(height: 20),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.04),
+                                borderRadius: BorderRadius.circular(99),
+                                border: Border.all(color: const Color(0x2DFFFFFF), width: 0.8),
+                              ),
+                              child: Text(
+                                'SYNCING NETWORK',
+                                style: _sg(size: 10, weight: FontWeight.w700, color: _D.textMid, spacing: 1.6),
+                              ),
+                            ),
+                            const SizedBox(height: 28),
                             const _LoadingBar(),
                           ],
                         ),
@@ -253,7 +274,7 @@ class _LoadingBar extends StatelessWidget {
           child: LinearProgressIndicator(
             minHeight: 4,
             backgroundColor: Colors.transparent,
-            color: _D.green,
+            color: _D.gold,
           ),
         ),
       ),

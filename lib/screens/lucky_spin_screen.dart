@@ -43,6 +43,17 @@ TextStyle _label({
   letterSpacing: letterSpacing ?? -0.2,
 );
 
+TextStyle _mono({
+  double size = 13,
+  FontWeight weight = FontWeight.w400,
+  Color color = _D.textHi,
+}) => GoogleFonts.spaceMono(
+  fontSize: size,
+  fontWeight: weight,
+  color: color,
+  letterSpacing: -0.3,
+);
+
 // ─── Segment Config ───────────────────────────────────────────────────────────
 class _Segment {
   final String label;
@@ -151,14 +162,23 @@ class _LuckySpinScreenState extends State<LuckySpinScreen>
       barrierColor: Colors.black.withOpacity(0.6),
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
-        child: ClipRRect(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 400,
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.82,
+          ),
+          child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: _D.surface.withOpacity(0.1),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xF21F1F26), Color(0xE6121216)],
+                ),
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(color: _D.glassBorder, width: 0.8),
                 boxShadow: [
@@ -251,6 +271,7 @@ class _LuckySpinScreenState extends State<LuckySpinScreen>
               ),
             ),
           ),
+        ),
         ),
       ),
     );
@@ -358,12 +379,20 @@ class _LuckySpinScreenState extends State<LuckySpinScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Lucky Spin Wheel',
-                                style: _label(
-                                  size: 16,
-                                  weight: FontWeight.w800,
-                                  color: _D.textHi,
+                              ShaderMask(
+                                blendMode: BlendMode.srcIn,
+                                shaderCallback: (r) => const LinearGradient(
+                                  colors: [_D.purple, _D.green],
+                                ).createShader(r),
+                                child: Text(
+                                  'Lucky Spin Wheel',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: _label(
+                                    size: 16,
+                                    weight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -385,19 +414,19 @@ class _LuckySpinScreenState extends State<LuckySpinScreen>
                           ),
                           decoration: BoxDecoration(
                             color: _D.purple.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(99),
                             border: Border.all(
                               color: _D.purple.withOpacity(0.4),
                               width: 0.8,
                             ),
                           ),
                           child: Text(
-                            _hasSpun ? 'Come back soon' : 'Ready!',
-                            style: _label(
-                              size: 11,
+                            _hasSpun ? 'COME BACK SOON' : 'READY',
+                            style: _mono(
+                              size: 10,
                               weight: FontWeight.w700,
                               color: _hasSpun ? _D.textLow : _D.purple,
-                            ),
+                            ).copyWith(letterSpacing: 1.4),
                           ),
                         ),
                       ],

@@ -385,12 +385,20 @@ class _Header extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Hash Burst',
-              style: _label(
-                size: 16,
-                weight: FontWeight.w800,
-                color: _D.textHi,
+            ShaderMask(
+              blendMode: BlendMode.srcIn,
+              shaderCallback: (r) => const LinearGradient(
+                colors: [_D.purple, _D.green],
+              ).createShader(r),
+              child: Text(
+                'Hash Burst',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: _label(
+                  size: 16,
+                  weight: FontWeight.w800,
+                  color: Colors.white,
+                ),
               ),
             ),
             const SizedBox(height: 2),
@@ -409,20 +417,19 @@ class _Header extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
         decoration: BoxDecoration(
           color: _D.purple.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(99),
           border: Border.all(
             color: _D.purple.withOpacity(0.4),
             width: 0.8,
           ),
         ),
         child: Text(
-          '$bursts left',
-          style: _label(
-            size: 11,
+          '$bursts LEFT',
+          style: _mono(
+            size: 10,
             weight: FontWeight.w700,
             color: _D.purple,
-            letterSpacing: 0.2,
-          ),
+          ).copyWith(letterSpacing: 1.4),
         ),
       ),
     ],
@@ -509,7 +516,7 @@ class _StatChip extends StatelessWidget {
                   size: 9,
                   weight: FontWeight.w700,
                   color: color.withOpacity(0.7),
-                  letterSpacing: 1.0,
+                  letterSpacing: 1.4,
                 ),
               ),
               const SizedBox(height: 5),

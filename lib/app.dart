@@ -48,7 +48,7 @@ class BtcSimApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider(create: (_) => AuthService()),
+        ChangeNotifierProvider(create: (_) => AuthService()),
         Provider(create: (_) => FirebaseSyncService()),
         ChangeNotifierProvider(create: (_) => BtcPriceService()),
         ChangeNotifierProvider(create: (_) => IapService()),

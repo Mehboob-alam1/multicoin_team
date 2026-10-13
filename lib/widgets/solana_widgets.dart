@@ -158,16 +158,52 @@ class SolanaGlassCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(radius),
-        gradient: Solana.brand,
-        boxShadow: glow ? Solana.dualGlow() : null,
+        boxShadow: glow
+            ? Solana.dualGlow()
+            : [
+                BoxShadow(
+                  color: Solana.purple.withValues(alpha: 0.10),
+                  blurRadius: 28,
+                  offset: const Offset(0, 12),
+                ),
+              ],
       ),
-      padding: const EdgeInsets.all(1.1),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius - 1),
-        child: Container(
-          padding: padding,
-          decoration: const BoxDecoration(gradient: Solana.cardWash),
-          child: child,
+        borderRadius: BorderRadius.circular(radius),
+        child: Stack(
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Solana.glassTop, Solana.glassBot],
+                ),
+                borderRadius: BorderRadius.circular(radius),
+                border: Border.all(color: Solana.hairline, width: 0.8),
+              ),
+              child: Padding(padding: padding, child: child),
+            ),
+            const Positioned(
+              top: 0,
+              left: 18,
+              right: 18,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Color(0x00FFFFFF),
+                        Color(0x38FFFFFF),
+                        Color(0x00FFFFFF),
+                      ],
+                    ),
+                  ),
+                  child: SizedBox(height: 1),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
