@@ -152,7 +152,6 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   bool _dailyBoostDialogShownThisSession = false;
   bool _launchOfferShownThisSession = false;
   Timer? _timer;
-  Timer? _syncTimer;
 
   @override
   void initState() {
@@ -206,8 +205,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     });
     context.read<LuckySpinService>().load();
     context.read<AchievementService>().load();
-    context.read<EventService>().load()
-        .then((_) => context.read<EventService>().refreshFromFirebaseIfNeeded());
+    context.read<EventService>().load();
     context.read<RandomDropService>().load();
     context.read<EnergyCoolingService>().load();
     context.read<LeaderboardService>().loadCache();
@@ -230,7 +228,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       await context.read<LoginStreakService>().recordLogin();
     });
     context.read<AdPacingService>().load();
-    context.read<AdRemoteConfigService>().load().then((_) async {
+    final adCfg = context.read<AdRemoteConfigService>();
+    final adReady = adCfg.isLoaded ? Future.value() : adCfg.load();
+    adReady.then((_) async {
       if (!mounted) return;
       await context.read<AnalyticsService>().initFromRemoteConfig();
       if (!mounted) return;
@@ -249,6 +249,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         if (!mounted) return;
         final referral = context.read<ReferralService>();
         final game = context.read<GameStateService>();
+        if (user.isAnonymous == true) return;
         final pending = await referral.consumePendingJoinBonuses();
         if (!mounted) return;
         if (pending > 0) {
@@ -356,17 +357,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       game.updateTick();
     });
 
-    _syncTimer = Timer.periodic(const Duration(minutes: 10), (_) {
-      if (!mounted) return;
-      context.read<GameStateService>().syncToCloud();
-    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
-    _syncTimer?.cancel();
     try {
       context.read<GameStateService>().onMiningStarted = null;
       context.read<GameStateService>().onMiningStopped = null;
@@ -378,11 +374,14 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       final game = context.read<GameStateService>();
-      game.load().then((_) {
-        if (!mounted) return;
-        context.read<GameStateService>().applyIdleEarningsOnResume();
-      });
-      context.read<AdRemoteConfigService>().load();
+      if (game.isLoaded) {
+        unawaited(game.applyIdleEarningsOnResume());
+      } else {
+        game.load().then((_) {
+          if (!mounted) return;
+          context.read<GameStateService>().applyIdleEarningsOnResume();
+        });
+      }
     }
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused ||

@@ -168,6 +168,7 @@ class AdRemoteConfigService extends ChangeNotifier {
       };
 
   Future<void> load() async {
+    if (_loaded) return;
     try {
       await _remoteConfig.setDefaults(defaultParameters);
       await _remoteConfig.setConfigSettings(RemoteConfigSettings(

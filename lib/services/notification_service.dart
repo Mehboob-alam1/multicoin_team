@@ -1,13 +1,14 @@
 import 'dart:io';
 
-import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
 
 import '../data/test_miners.dart';
+import 'supabase_bootstrap.dart';
 
 class NotificationService extends ChangeNotifier {
   String? _token;
@@ -91,15 +92,25 @@ class NotificationService extends ChangeNotifier {
     if (_fcmBound) return;
     _fcmBound = true;
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastUid = prefs.getString('fcm_last_uid');
+      final lastToken = prefs.getString('fcm_last_token');
+      if (lastUid == uid && lastToken == _token) return;
       final region = TestMiners.regionFromCountryCode(
         PlatformDispatcher.instance.locale.countryCode,
       );
-      await FirebaseDatabase.instance.ref('users/$uid/fcm').set({
-        'token': _token,
-        'region': region,
-        'platform': Platform.isIOS ? 'ios' : 'android',
-        'updatedAt': DateTime.now().millisecondsSinceEpoch,
-      });
+      final sb = SupabaseBootstrap.client;
+      if (sb != null) {
+        await sb.from('fcm_tokens').upsert({
+          'uid': uid,
+          'token': _token,
+          'region': region,
+          'platform': Platform.isIOS ? 'ios' : 'android',
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        });
+      }
+      await prefs.setString('fcm_last_uid', uid);
+      await prefs.setString('fcm_last_token', _token!);
     } catch (_) {}
   }
 

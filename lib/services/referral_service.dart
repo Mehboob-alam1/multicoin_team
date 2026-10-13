@@ -1,8 +1,8 @@
 import 'dart:math';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'local_feature_store.dart';
+import 'supabase_bootstrap.dart';
 
 class ReferredUser {
   final String uid;
@@ -26,11 +26,9 @@ class ReferralApplyResult {
   const ReferralApplyResult(this.status, this.message);
 }
 
-/// Unique per-user referral codes, join bonuses, and referred-user list (Firestore).
+/// Referral codes live locally first. Signed-in users sync to Supabase at most every 24h.
 class ReferralService extends ChangeNotifier {
   ReferralService();
-
-  final _firestore = FirebaseFirestore.instance;
 
   static const inviterBonusBtc = 0.00005;
   static const welcomeBonusBtc = 0.00002;
@@ -40,13 +38,18 @@ class ReferralService extends ChangeNotifier {
   static const _claimedKey = 'referral_claimed';
   static const _queuedCodeKey = 'referral_queued_join_code';
   static const _guestCodeKey = 'referral_guest_code';
+  static const _lastCloudKey = 'referral_last_cloud_ms';
+  static const _indexedKey = 'referral_code_indexed';
+  static const _invitesCacheKey = 'referral_invites_cache';
+  static const _bonusCheckKey = 'referral_bonus_check_ms';
+  static const _cloudMaxAge = Duration(hours: 24);
   static const _alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
   String? _uid;
   String? _myCode;
   String? _referredBy;
   int _friends = 0;
-  int _pendingJoinBonuses = 0;
+  int _pendingJoinBonuses = 0; // set from cloud; consumed via RPC
   List<String> _claimed = [];
   List<ReferredUser> _referredUsers = [];
   bool _loadInFlight = false;
@@ -55,6 +58,7 @@ class ReferralService extends ChangeNotifier {
   String? get referredBy => _referredBy;
   bool get hasUsedReferralCode => _referredBy != null && _referredBy!.isNotEmpty;
   int get friends => _friends;
+  int get pendingJoinBonuses => _pendingJoinBonuses;
   List<String> get claimedRewards => List.unmodifiable(_claimed);
   List<ReferredUser> get referredUsers => List.unmodifiable(_referredUsers);
 
@@ -73,8 +77,6 @@ class ReferralService extends ChangeNotifier {
     return raw.trim().toUpperCase();
   }
 
-  /// Shows a code in Profile even before Firebase Auth exists; persists it locally
-  /// and writes to Firestore when possible.
   Future<void> ensureLoaded({
     required String? uid,
     String? displayName,
@@ -102,20 +104,6 @@ class ReferralService extends ChangeNotifier {
     _myCode = code;
     await LocalFeatureStore.set(_cacheKeyCode, code);
     notifyListeners();
-    try {
-      final docId = 'guest_$code';
-      await _firestore.collection('referrals').doc(docId).set({
-        'code': code,
-        'uid': docId,
-        'friends': 0,
-        'isGuest': true,
-        'displayName': displayName ?? 'Guest Miner',
-        'createdAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      await _ensureCodeIndex(code, docId);
-    } catch (e) {
-      debugPrint('ReferralService._loadUnsignedGuest: $e');
-    }
   }
 
   Future<void> load(String uid, {String? displayName, bool signedIn = true}) async {
@@ -130,81 +118,84 @@ class ReferralService extends ChangeNotifier {
     _myCode = LocalFeatureStore.get(_cacheKeyCode)?.toString();
     final cachedFriends = LocalFeatureStore.get(_cacheKeyFriends);
     if (cachedFriends is num) _friends = cachedFriends.toInt();
+    _restoreInvitesCache();
+    if ((_myCode == null || _myCode!.isEmpty) && signedIn) {
+      final fromUid = codeCandidatesFromUid(uid);
+      if (fromUid.isNotEmpty) _myCode = fromUid.first;
+    }
     notifyListeners();
 
-    try {
-      final docRef = _firestore.collection('referrals').doc(uid);
-      final doc = await docRef.get();
-      if (!doc.exists) {
-        final code = await _assignCode(uid, signedIn: signedIn);
-        _myCode = code;
-        _friends = 0;
-        _pendingJoinBonuses = 0;
-        _referredBy = null;
-        await docRef.set({
-          'code': code,
-          'uid': uid,
-          'friends': 0,
-          'pendingJoinBonuses': 0,
-          'isGuest': !signedIn,
-          'displayName': displayName ?? 'Miner',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      } else {
-        final d = doc.data() ?? {};
-        var code = d['code']?.toString();
-        final previous = (code != null && code.isNotEmpty) ? code.toUpperCase() : null;
-        final assigned = await _assignCode(uid, signedIn: signedIn, existing: previous);
-        if (previous != null && previous != assigned) {
-          await _ensureCodeIndex(previous, uid);
-        }
-        code = assigned;
-        await docRef.set({
-          'code': code,
-          'uid': uid,
-          'isGuest': !signedIn,
-          if (previous != null && previous != code) 'previousCode': previous,
-        }, SetOptions(merge: true));
-        _myCode = code;
-        _friends = (d['friends'] as num?)?.toInt() ?? 0;
-        _pendingJoinBonuses = (d['pendingJoinBonuses'] as num?)?.toInt() ?? 0;
-        _referredBy = d['referredBy']?.toString();
-        if (displayName != null && displayName.isNotEmpty) {
-          await docRef.set({'displayName': displayName}, SetOptions(merge: true));
-        }
+    if (!signedIn) {
+      if (_myCode == null || _myCode!.isEmpty) {
+        _myCode = LocalFeatureStore.get(_guestCodeKey)?.toString() ?? _randomSix();
       }
+      await LocalFeatureStore.set(_cacheKeyCode, _myCode);
+      await LocalFeatureStore.set(_guestCodeKey, _myCode);
+      _loadInFlight = false;
+      notifyListeners();
+      return;
+    }
 
-      QuerySnapshot<Map<String, dynamic>> invites;
-      try {
-        invites = await docRef
-            .collection('invites')
-            .orderBy('joinedAt', descending: true)
-            .limit(50)
-            .get();
-      } catch (_) {
-        invites = await docRef.collection('invites').limit(50).get();
-      }
-      _referredUsers = invites.docs.map((e) {
-        final d = e.data();
-        final ts = d['joinedAt'];
-        return ReferredUser(
-          uid: e.id,
-          displayName: (d['displayName'] as String?)?.trim().isNotEmpty == true
-              ? d['displayName'] as String
-              : 'Miner',
-          joinedAt: ts is Timestamp ? ts.toDate() : null,
+    final lastCloud = LocalFeatureStore.get(_lastCloudKey);
+    final cloudFresh = lastCloud is int &&
+        DateTime.now().millisecondsSinceEpoch - lastCloud < _cloudMaxAge.inMilliseconds;
+    if (_myCode != null && _myCode!.isNotEmpty && cloudFresh) {
+      _loadInFlight = false;
+      return;
+    }
+
+    final client = SupabaseBootstrap.client;
+    try {
+      if (client != null) {
+        final row = await client.from('referrals').select().eq('uid', uid).maybeSingle();
+        if (row == null) {
+          final fromUid = codeCandidatesFromUid(uid);
+          final code = (_myCode != null && _myCode!.isNotEmpty)
+              ? _myCode!.toUpperCase()
+              : (fromUid.isNotEmpty ? fromUid.first : _randomSix());
+          _myCode = code;
+          _friends = 0;
+          _pendingJoinBonuses = 0;
+          _referredBy = null;
+          await client.from('referrals').upsert({
+            'uid': uid,
+            'code': code,
+            'friends': 0,
+            'pending_join_bonuses': 0,
+            'is_guest': !signedIn,
+            'display_name': displayName ?? 'Miner',
+          });
+          await _ensureCodeIndex(code, uid);
+          await LocalFeatureStore.set(_indexedKey, true);
+        } else {
+          var code = row['code']?.toString();
+          if (code == null || code.isEmpty) {
+            code = await _assignCode(uid, signedIn: signedIn);
+            await client.from('referrals').update({'code': code}).eq('uid', uid);
+          }
+          _myCode = code.toUpperCase();
+          _friends = (row['friends'] as num?)?.toInt() ?? 0;
+          _pendingJoinBonuses = (row['pending_join_bonuses'] as num?)?.toInt() ?? 0;
+          _referredBy = row['referred_by']?.toString();
+          if (LocalFeatureStore.get(_indexedKey) != true) {
+            await _ensureCodeIndex(_myCode!, uid);
+            await LocalFeatureStore.set(_indexedKey, true);
+          }
+        }
+        if (!cloudFresh) await _refreshInvites(uid);
+        await LocalFeatureStore.set(
+          _lastCloudKey,
+          DateTime.now().millisecondsSinceEpoch,
         );
-      }).toList();
-      if (_referredUsers.length > _friends) {
-        _friends = _referredUsers.length;
+      } else if (_myCode == null || _myCode!.isEmpty) {
+        final fromUid = codeCandidatesFromUid(uid);
+        _myCode = fromUid.isNotEmpty ? fromUid.first : _randomSix();
       }
     } catch (e) {
       debugPrint('ReferralService.load: $e');
       if (_myCode == null || _myCode!.isEmpty) {
         final fromUid = codeCandidatesFromUid(uid);
-        _myCode = signedIn
-            ? (fromUid.isNotEmpty ? fromUid.first : _randomSix())
-            : (LocalFeatureStore.get(_guestCodeKey)?.toString() ?? _randomSix());
+        _myCode = fromUid.isNotEmpty ? fromUid.first : _randomSix();
       }
     } finally {
       _loadInFlight = false;
@@ -218,21 +209,88 @@ class ReferralService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Pay out unclaimed per-join bonuses. Caller should grant BTC × [inviterBonusBtc].
+  void _restoreInvitesCache() {
+    final raw = LocalFeatureStore.get(_invitesCacheKey);
+    if (raw is! List) return;
+    _referredUsers = raw.map((e) {
+      if (e is! Map) {
+        return const ReferredUser(uid: '', displayName: 'Miner');
+      }
+      final m = Map<String, dynamic>.from(e);
+      final joinedMs = m['joinedAtMs'];
+      return ReferredUser(
+        uid: m['uid']?.toString() ?? '',
+        displayName: (m['displayName'] as String?)?.trim().isNotEmpty == true
+            ? m['displayName'] as String
+            : 'Miner',
+        joinedAt: joinedMs is num
+            ? DateTime.fromMillisecondsSinceEpoch(joinedMs.toInt())
+            : null,
+      );
+    }).where((e) => e.uid.isNotEmpty).toList();
+    if (_referredUsers.length > _friends) {
+      _friends = _referredUsers.length;
+    }
+  }
+
+  Future<void> _refreshInvites(String uid) async {
+    final client = SupabaseBootstrap.client;
+    if (client == null) return;
+    try {
+      final rows = await client
+          .from('referral_invites')
+          .select()
+          .eq('inviter_uid', uid)
+          .order('joined_at', ascending: false)
+          .limit(50);
+      _referredUsers = (rows as List).map((e) {
+        final d = Map<String, dynamic>.from(e as Map);
+        final joined = d['joined_at']?.toString();
+        return ReferredUser(
+          uid: d['invitee_uid']?.toString() ?? '',
+          displayName: (d['display_name'] as String?)?.trim().isNotEmpty == true
+              ? d['display_name'] as String
+              : 'Miner',
+          joinedAt: joined != null ? DateTime.tryParse(joined) : null,
+        );
+      }).where((e) => e.uid.isNotEmpty).toList();
+      if (_referredUsers.length > _friends) {
+        _friends = _referredUsers.length;
+      }
+      await LocalFeatureStore.set(
+        _invitesCacheKey,
+        _referredUsers
+            .map((e) => {
+                  'uid': e.uid,
+                  'displayName': e.displayName,
+                  'joinedAtMs': e.joinedAt?.millisecondsSinceEpoch,
+                })
+            .toList(),
+      );
+    } catch (e) {
+      debugPrint('ReferralService._refreshInvites: $e');
+    }
+  }
+
   Future<int> consumePendingJoinBonuses() async {
     final uid = _uid;
     if (uid == null) return 0;
+    final last = LocalFeatureStore.get(_bonusCheckKey);
+    if (last is int &&
+        DateTime.now().millisecondsSinceEpoch - last < _cloudMaxAge.inMilliseconds) {
+      return 0;
+    }
+    await LocalFeatureStore.set(
+      _bonusCheckKey,
+      DateTime.now().millisecondsSinceEpoch,
+    );
+    final client = SupabaseBootstrap.client;
+    if (client == null) return 0;
     try {
-      final ref = _firestore.collection('referrals').doc(uid);
-      final paid = await _firestore.runTransaction((tx) async {
-        final snap = await tx.get(ref);
-        final n = (snap.data()?['pendingJoinBonuses'] as num?)?.toInt() ?? 0;
-        if (n <= 0) return 0;
-        tx.set(ref, {'pendingJoinBonuses': 0}, SetOptions(merge: true));
-        return n;
-      });
-      _pendingJoinBonuses = 0;
-      return paid;
+      final paid = await client.rpc('consume_referral_bonuses');
+      final n = paid is num ? paid.toInt() : int.tryParse('$paid') ?? 0;
+      if (n > 0) _pendingJoinBonuses = 0;
+      return n;
     } catch (e) {
       debugPrint('ReferralService.consumePendingJoinBonuses: $e');
       return 0;
@@ -248,84 +306,50 @@ class ReferralService extends ChangeNotifier {
     if (clean.isEmpty) {
       return const ReferralApplyResult(ReferralApplyStatus.invalid, 'Enter a referral code.');
     }
-    try {
-      final codeSnap = await _firestore.collection('referralCodes').doc(clean).get();
-      String? inviterUid = codeSnap.data()?['uid']?.toString();
-      if (inviterUid == null || inviterUid.isEmpty) {
-        final q = await _firestore
-            .collection('referrals')
-            .where('code', isEqualTo: clean)
-            .limit(1)
-            .get();
-        if (q.docs.isEmpty) {
-          return const ReferralApplyResult(ReferralApplyStatus.invalid, 'That code was not found.');
-        }
-        inviterUid = q.docs.first.id;
-        await _ensureCodeIndex(clean, inviterUid);
-      }
-      if (inviterUid == myUid) {
-        return const ReferralApplyResult(ReferralApplyStatus.self, 'You cannot use your own code.');
-      }
-
-      final inviteeRef = _firestore.collection('referrals').doc(myUid);
-      final inviterRef = _firestore.collection('referrals').doc(inviterUid);
-      final inviteRef = inviterRef.collection('invites').doc(myUid);
-      final name = (displayName == null || displayName.trim().isEmpty) ? 'Miner' : displayName.trim();
-
-      final status = await _firestore.runTransaction((tx) async {
-        final me = await tx.get(inviteeRef);
-        final already = me.data()?['referredBy']?.toString();
-        if (already != null && already.isNotEmpty) {
-          return ReferralApplyStatus.alreadyUsed;
-        }
-        final inviter = await tx.get(inviterRef);
-        final friends = (inviter.data()?['friends'] as num?)?.toInt() ?? 0;
-        final pending = (inviter.data()?['pendingJoinBonuses'] as num?)?.toInt() ?? 0;
-        tx.set(
-          inviteeRef,
-          {
-            'referredBy': inviterUid,
-            'referredByCode': clean,
-            'referredAt': FieldValue.serverTimestamp(),
-            if (!me.exists) 'friends': 0,
-          },
-          SetOptions(merge: true),
-        );
-        if (inviter.exists) {
-          tx.update(inviterRef, {
-            'friends': friends + 1,
-            'pendingJoinBonuses': pending + 1,
-          });
-        } else {
-          tx.set(inviterRef, {
-            'friends': 1,
-            'pendingJoinBonuses': 1,
-            'code': clean,
-          }, SetOptions(merge: true));
-        }
-        tx.set(inviteRef, {
-          'uid': myUid,
-          'displayName': name,
-          'joinedAt': FieldValue.serverTimestamp(),
-          'codeUsed': clean,
-        });
-        return ReferralApplyStatus.success;
-      });
-
-      if (status == ReferralApplyStatus.alreadyUsed) {
-        _referredBy = 'used';
-        notifyListeners();
-        return const ReferralApplyResult(
-          ReferralApplyStatus.alreadyUsed,
-          'You already used a referral code.',
-        );
-      }
-      _referredBy = inviterUid;
-      notifyListeners();
+    if (clean == (_myCode ?? '').toUpperCase()) {
+      return const ReferralApplyResult(ReferralApplyStatus.self, 'You cannot use your own code.');
+    }
+    final client = SupabaseBootstrap.client;
+    if (client == null) {
       return const ReferralApplyResult(
-        ReferralApplyStatus.success,
-        'Referral applied. Welcome bonus added!',
+        ReferralApplyStatus.error,
+        'Cloud is not configured yet.',
       );
+    }
+    try {
+      final raw = await client.rpc('apply_referral', params: {
+        'p_code': clean,
+        'p_display_name': (displayName == null || displayName.trim().isEmpty)
+            ? 'Miner'
+            : displayName.trim(),
+      });
+      final map = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+      final status = map['status']?.toString() ?? 'error';
+      switch (status) {
+        case 'invalid':
+          return const ReferralApplyResult(ReferralApplyStatus.invalid, 'That code was not found.');
+        case 'self':
+          return const ReferralApplyResult(ReferralApplyStatus.self, 'You cannot use your own code.');
+        case 'already_used':
+          _referredBy = 'used';
+          notifyListeners();
+          return const ReferralApplyResult(
+            ReferralApplyStatus.alreadyUsed,
+            'You already used a referral code.',
+          );
+        case 'success':
+          _referredBy = map['inviter_uid']?.toString() ?? 'ok';
+          notifyListeners();
+          return const ReferralApplyResult(
+            ReferralApplyStatus.success,
+            'Referral applied. Welcome bonus added!',
+          );
+        default:
+          return const ReferralApplyResult(
+            ReferralApplyStatus.error,
+            'Could not apply that code. Try again.',
+          );
+      }
     } catch (e) {
       debugPrint('ReferralService.applyReferral: $e');
       return const ReferralApplyResult(
@@ -356,8 +380,6 @@ class ReferralService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Signed-in: last 6 digits of Firebase uid, else first 6 digits, else last/first 6 chars.
-  /// Guest / not signed in: stable random 6-character code.
   static List<String> codeCandidatesFromUid(String uid) {
     final digits = uid.replaceAll(RegExp(r'[^0-9]'), '');
     final alnum = uid.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
@@ -390,29 +412,19 @@ class ReferralService extends ChangeNotifier {
     final candidates = <String>[];
     if (signedIn) {
       candidates.addAll(codeCandidatesFromUid(uid));
-    } else {
-      if (existing != null && existing.isNotEmpty) {
-        candidates.add(existing.toUpperCase());
-      }
-      final cached = LocalFeatureStore.get(_guestCodeKey)?.toString();
-      if (cached != null && cached.isNotEmpty) {
-        candidates.add(cached.toUpperCase());
-      }
-    }
-    if (existing != null && existing.isNotEmpty && signedIn) {
-      // Prefer uid-based codes, but keep a working existing code if all uid slices are taken.
+    } else if (existing != null && existing.isNotEmpty) {
       candidates.add(existing.toUpperCase());
     }
-
+    if (existing != null && existing.isNotEmpty && signedIn) {
+      candidates.add(existing.toUpperCase());
+    }
     for (final c in candidates) {
       if (c.length < 4) continue;
-      final claimed = await _tryIndexCode(c, uid);
-      if (claimed) return c;
+      if (await _tryIndexCode(c, uid)) return c;
     }
     for (var i = 0; i < 16; i++) {
       final code = _randomSix();
-      final claimed = await _tryIndexCode(code, uid);
-      if (claimed) return code;
+      if (await _tryIndexCode(code, uid)) return code;
     }
     final fallback = (uid.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase() + _alphabet)
         .padRight(6, 'X')
@@ -422,28 +434,20 @@ class ReferralService extends ChangeNotifier {
   }
 
   Future<void> _ensureCodeIndex(String code, String uid) async {
-    try {
-      final ref = _firestore.collection('referralCodes').doc(code);
-      final snap = await ref.get();
-      if (!snap.exists) {
-        await ref.set({'uid': uid, 'createdAt': FieldValue.serverTimestamp()});
-      }
-    } catch (e) {
-      debugPrint('ReferralService._ensureCodeIndex: $e');
-    }
+    await _tryIndexCode(code, uid);
   }
 
   Future<bool> _tryIndexCode(String code, String uid) async {
+    final client = SupabaseBootstrap.client;
+    if (client == null) return true;
     try {
-      final ref = _firestore.collection('referralCodes').doc(code);
-      return await _firestore.runTransaction((tx) async {
-        final snap = await tx.get(ref);
-        if (snap.exists) {
-          return snap.data()?['uid'] == uid;
-        }
-        tx.set(ref, {'uid': uid, 'createdAt': FieldValue.serverTimestamp()});
-        return true;
-      });
+      final existing =
+          await client.from('referral_codes').select('uid').eq('code', code).maybeSingle();
+      if (existing != null) {
+        return existing['uid']?.toString() == uid;
+      }
+      await client.from('referral_codes').insert({'code': code, 'uid': uid});
+      return true;
     } catch (_) {
       return false;
     }

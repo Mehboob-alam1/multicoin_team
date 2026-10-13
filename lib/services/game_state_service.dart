@@ -22,9 +22,17 @@ class GameStateService extends ChangeNotifier {
   static const _key = 'btc_sim_player_data';
   static const _foregroundSnapshotKey = 'btc_sim_foreground_snapshot';
   static const _premiumExpiryKey = 'btc_sim_premium_expiry';
+  static const _purchasesKey = 'btc_sim_purchases';
+  static const _boostExpiryKey = 'btc_sim_boost_expiry';
+  static const _lastRemoteSyncKey = 'btc_sim_last_remote_sync_ms';
+  static const _lastRemoteFetchKey = 'btc_sim_last_remote_fetch_ms';
+  static const _lastLbWriteKey = 'btc_sim_last_lb_write_ms';
   static const _maxIdleMinutes = 8 * 60;
   static const _sessionMinutes = 30;
-  static const _minRemoteSyncInterval = Duration(minutes: 12);
+  /// Cloud backup only. Local SharedPreferences is the source of truth.
+  static const _minRemoteSyncInterval = Duration(hours: 6);
+  static const _minRemoteFetchInterval = Duration(hours: 24);
+  static const _minLeaderboardWriteInterval = Duration(hours: 24);
 
   PlayerData _data = const PlayerData();
   DateTime? _lastTick;
@@ -191,6 +199,16 @@ class GameStateService extends ChangeNotifier {
 
   String get _premiumPrefsKey =>
       _userId != null ? '${_premiumExpiryKey}_$_userId' : _premiumExpiryKey;
+  String get _purchasesPrefsKey =>
+      _userId != null ? '${_purchasesKey}_$_userId' : _purchasesKey;
+  String get _boostPrefsKey =>
+      _userId != null ? '${_boostExpiryKey}_$_userId' : _boostExpiryKey;
+  String get _lastRemoteSyncPrefsKey =>
+      _userId != null ? '${_lastRemoteSyncKey}_$_userId' : _lastRemoteSyncKey;
+  String get _lastRemoteFetchPrefsKey =>
+      _userId != null ? '${_lastRemoteFetchKey}_$_userId' : _lastRemoteFetchKey;
+  String get _lastLbWritePrefsKey =>
+      _userId != null ? '${_lastLbWriteKey}_$_userId' : _lastLbWriteKey;
 
   Future<void> _readCachedPremium(SharedPreferences prefs) async {
     final ms = prefs.getInt(_premiumPrefsKey);
@@ -204,6 +222,44 @@ class GameStateService extends ChangeNotifier {
     } else {
       await prefs.setInt(_premiumPrefsKey, _premiumExpiry!.millisecondsSinceEpoch);
     }
+  }
+
+  Future<void> _readCachedEntitlements(SharedPreferences prefs) async {
+    final raw = prefs.getString(_purchasesPrefsKey);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        _purchasedOneTimeIds =
+            (jsonDecode(raw) as List).map((e) => e.toString()).toList();
+      } catch (_) {}
+    }
+    final boostMs = prefs.getInt(_boostPrefsKey);
+    if (boostMs != null) {
+      final expiry = DateTime.fromMillisecondsSinceEpoch(boostMs);
+      _boostExpiry = expiry.isAfter(DateTime.now()) ? expiry : null;
+    }
+    final syncMs = prefs.getInt(_lastRemoteSyncPrefsKey);
+    if (syncMs != null) {
+      _lastRemoteSyncAt = DateTime.fromMillisecondsSinceEpoch(syncMs);
+    }
+  }
+
+  Future<void> _writeCachedEntitlements(SharedPreferences prefs) async {
+    await prefs.setString(
+      _purchasesPrefsKey,
+      jsonEncode(_purchasedOneTimeIds),
+    );
+    if (_boostExpiry == null) {
+      await prefs.remove(_boostPrefsKey);
+    } else {
+      await prefs.setInt(_boostPrefsKey, _boostExpiry!.millisecondsSinceEpoch);
+    }
+    await _writeCachedPremium(prefs);
+  }
+
+  bool _isFresh(SharedPreferences prefs, String key, Duration maxAge) {
+    final ms = prefs.getInt(key);
+    if (ms == null) return false;
+    return DateTime.now().millisecondsSinceEpoch - ms < maxAge.inMilliseconds;
   }
 
   Future<void> load() async {
@@ -227,6 +283,7 @@ class GameStateService extends ChangeNotifier {
       }
     }
     await _readCachedPremium(prefs);
+    await _readCachedEntitlements(prefs);
 
     _lastTick = DateTime.now();
     if (_data.miningSessionEndsAt != null &&
@@ -241,7 +298,10 @@ class GameStateService extends ChangeNotifier {
 
     if (_userId != null && !_fetchedRemoteThisSession) {
       _fetchedRemoteThisSession = true;
-      unawaited(_mergeRemoteAfterLocal(hadLocalData));
+      final fetchFresh = _isFresh(prefs, _lastRemoteFetchPrefsKey, _minRemoteFetchInterval);
+      if (!hadLocalData || !fetchFresh) {
+        unawaited(_mergeRemoteAfterLocal(hadLocalData));
+      }
     }
   }
 
@@ -249,33 +309,44 @@ class GameStateService extends ChangeNotifier {
     if (_userId == null) return;
     try {
       final remote = await _firebaseSync.fetchPlayerData(_userId!);
-      if (remote != null && hadLocalData) {
-        final localData = _data;
-        _data = remote;
-        final mergedCoins = Map<String, double>.from(_data.coinBalances);
-        for (final e in localData.coinBalances.entries) {
-          final cur = mergedCoins[e.key] ?? 0;
-          if (e.value > cur) mergedCoins[e.key] = e.value;
+      if (remote != null) {
+        if (!hadLocalData) {
+          _data = remote;
+        } else {
+          final localData = _data;
+          _data = remote;
+          final mergedCoins = Map<String, double>.from(_data.coinBalances);
+          for (final e in localData.coinBalances.entries) {
+            final cur = mergedCoins[e.key] ?? 0;
+            if (e.value > cur) mergedCoins[e.key] = e.value;
+          }
+          final mergedLife = Map<String, double>.from(_data.lifetimeMinedByCoin);
+          for (final e in localData.lifetimeMinedByCoin.entries) {
+            final cur = mergedLife[e.key] ?? 0;
+            if (e.value > cur) mergedLife[e.key] = e.value;
+          }
+          final btcBal = mergedCoins[Coins.primaryId] ?? _data.btcBalance;
+          final lifeBtc = mergedLife[Coins.primaryId] ?? _data.lifetimeMinedBtc;
+          _data = _data.copyWith(
+            coinBalances: mergedCoins,
+            lifetimeMinedByCoin: mergedLife,
+            btcBalance: btcBal,
+            lifetimeMinedBtc: lifeBtc,
+          );
         }
-        final mergedLife = Map<String, double>.from(_data.lifetimeMinedByCoin);
-        for (final e in localData.lifetimeMinedByCoin.entries) {
-          final cur = mergedLife[e.key] ?? 0;
-          if (e.value > cur) mergedLife[e.key] = e.value;
-        }
-        final btcBal = mergedCoins[Coins.primaryId] ?? _data.btcBalance;
-        final lifeBtc = mergedLife[Coins.primaryId] ?? _data.lifetimeMinedBtc;
-        _data = _data.copyWith(
-          coinBalances: mergedCoins,
-          lifetimeMinedByCoin: mergedLife,
-          btcBalance: btcBal,
-          lifetimeMinedBtc: lifeBtc,
-        );
       }
-      _purchasedOneTimeIds = await _firebaseSync.getOneTimePurchases(_userId!);
-      _premiumExpiry = await _firebaseSync.getSubscriptionExpiry(_userId!);
-      _boostExpiry = await _loadBoostExpiry();
+      if (_purchasedOneTimeIds.isEmpty) {
+        _purchasedOneTimeIds = await _firebaseSync.getOneTimePurchases(_userId!);
+      }
+      if (_premiumExpiry == null) {
+        _premiumExpiry = await _firebaseSync.getSubscriptionExpiry(_userId!);
+      }
       final prefs = await SharedPreferences.getInstance();
-      await _writeCachedPremium(prefs);
+      await prefs.setInt(
+        _lastRemoteFetchPrefsKey,
+        DateTime.now().millisecondsSinceEpoch,
+      );
+      await _writeCachedEntitlements(prefs);
       await _persist(forceRemote: false, markDirty: false);
       notifyListeners();
     } catch (e) {
@@ -319,11 +390,6 @@ class GameStateService extends ChangeNotifier {
       }
       await prefs.remove(_foregroundSnapshotKey);
     } catch (_) {}
-  }
-
-  Future<DateTime?> _loadBoostExpiry() async {
-    if (_userId == null) return null;
-    return _firebaseSync.getBoostExpiry(_userId!);
   }
 
   void _applyIdleEarnings() {
@@ -392,27 +458,32 @@ class GameStateService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final key = _userId != null ? '${_key}_$_userId' : _key;
     await prefs.setString(key, jsonEncode(_data.toJson()));
+    await _writeCachedEntitlements(prefs);
   }
 
   Future<void> _persist({bool forceRemote = false, bool markDirty = true}) async {
     final prefs = await SharedPreferences.getInstance();
     final key = _userId != null ? '${_key}_$_userId' : _key;
-    await prefs.setString(key, jsonEncode(_data.toJson())); // always write local first
+    await prefs.setString(key, jsonEncode(_data.toJson()));
+    await _writeCachedEntitlements(prefs);
 
-    if (_userId != null) {
-      if (markDirty) _remoteDirty = true;
-      if (!forceRemote && !_remoteDirty) return;
-      final now = DateTime.now();
-      final shouldSync = forceRemote ||
-          _lastRemoteSyncAt == null ||
-          now.difference(_lastRemoteSyncAt!) >= _minRemoteSyncInterval;
-      if (!shouldSync) return;
+    if (_userId == null) return;
+    if (markDirty) _remoteDirty = true;
+    if (!_remoteDirty) return;
 
-      _syncInProgress = true;
-      _lastSyncError = null;
-      notifyListeners();
-      try {
-        await _firebaseSync.syncPlayerData(_userId!, _data, displayName: _displayName);
+    final now = DateTime.now();
+    final due = _lastRemoteSyncAt == null ||
+        now.difference(_lastRemoteSyncAt!) >= _minRemoteSyncInterval;
+    if (!forceRemote && !due) return;
+    if (forceRemote && !due && _lastRemoteSyncAt != null) return;
+
+    _syncInProgress = true;
+    _lastSyncError = null;
+    notifyListeners();
+    try {
+      await _firebaseSync.syncPlayerData(_userId!, _data, displayName: _displayName);
+      final lbDue = !_isFresh(prefs, _lastLbWritePrefsKey, _minLeaderboardWriteInterval);
+      if (lbDue) {
         await _firebaseSync.updateLeaderboard(
           _userId!,
           displayName: _displayName,
@@ -423,14 +494,19 @@ class GameStateService extends ChangeNotifier {
             PlatformDispatcher.instance.locale.countryCode,
           ),
         );
-        _lastRemoteSyncAt = now;
-        _remoteDirty = false;
-      } catch (e) {
-        _lastSyncError = e.toString();
+        await prefs.setInt(
+          _lastLbWritePrefsKey,
+          now.millisecondsSinceEpoch,
+        );
       }
-      _syncInProgress = false;
-      notifyListeners();
+      _lastRemoteSyncAt = now;
+      _remoteDirty = false;
+      await prefs.setInt(_lastRemoteSyncPrefsKey, now.millisecondsSinceEpoch);
+    } catch (e) {
+      _lastSyncError = e.toString();
     }
+    _syncInProgress = false;
+    notifyListeners();
   }
 
   /// Call when app goes to background. Saves lastClosedAt so mining continues
@@ -453,17 +529,13 @@ class GameStateService extends ChangeNotifier {
         sessionEndsAt: _data.miningSessionEndsAt,
       );
     } catch (_) {}
-    // 3) Firebase sync in background; don't block so lifecycle callback returns fast.
-    if (_userId != null) {
-      _remoteDirty = true;
-      _persist(forceRemote: true).catchError((_) {});
-    }
+    // Cloud backup is interval-gated inside _persist; never block lifecycle.
+    if (_userId != null) _remoteDirty = true;
   }
 
-  /// Sync current state to local storage and Firebase so balance is never lost.
-  /// Call periodically (e.g. every few minutes) to keep cloud in sync.
+  /// Rare cloud backup. Local save always runs; Firebase only if 6h elapsed.
   Future<void> syncToCloud() async {
-    await _persist(forceRemote: true, markDirty: true);
+    await _persist(forceRemote: false, markDirty: true);
   }
 
   /// Saves a snapshot of "last seen in foreground" so if the app is killed
@@ -672,6 +744,9 @@ class GameStateService extends ChangeNotifier {
       await _writeCachedPremium(prefs);
     }
 
+    if (!delivery.isSubscription && !_purchasedOneTimeIds.contains(productId)) {
+      _purchasedOneTimeIds = [..._purchasedOneTimeIds, productId];
+    }
     if (_userId != null) {
       try {
         await _firebaseSync.recordGooglePlayPurchase(
@@ -686,12 +761,7 @@ class GameStateService extends ChangeNotifier {
           rigId: p?.rigId,
           source: delivery.source,
         );
-        if (!delivery.isSubscription) {
-          _purchasedOneTimeIds = await _firebaseSync.getOneTimePurchases(_userId!);
-        }
       } catch (_) {}
-    } else if (!delivery.isSubscription && !_purchasedOneTimeIds.contains(productId)) {
-      _purchasedOneTimeIds = [..._purchasedOneTimeIds, productId];
     }
 
     if (productId == 'boost_2x_1h') {
@@ -715,17 +785,17 @@ class GameStateService extends ChangeNotifier {
     double? btcAmount,
     String? rigId,
   }) async {
+    if (_purchasedOneTimeIds.contains(productId) &&
+        !ShopProducts.isRepeatableFarmRigProduct(productId)) {
+      return;
+    }
+    if (!_purchasedOneTimeIds.contains(productId)) {
+      _purchasedOneTimeIds = [..._purchasedOneTimeIds, productId];
+    }
     if (_userId != null) {
-      await _firebaseSync.recordOneTimePurchase(_userId!, productId);
-      _purchasedOneTimeIds = await _firebaseSync.getOneTimePurchases(_userId!);
-    } else {
-      if (_purchasedOneTimeIds.contains(productId) &&
-          !ShopProducts.isRepeatableFarmRigProduct(productId)) {
-        return;
-      }
-      if (!_purchasedOneTimeIds.contains(productId)) {
-        _purchasedOneTimeIds = [..._purchasedOneTimeIds, productId];
-      }
+      try {
+        await _firebaseSync.recordOneTimePurchase(_userId!, productId);
+      } catch (_) {}
     }
     if (btcAmount != null && btcAmount > 0) {
       _data = _addMinedToCoin(_data, Coins.primaryId, MiningEconomy.toSol(btcAmount));
@@ -739,9 +809,8 @@ class GameStateService extends ChangeNotifier {
 
   Future<void> activateBoost({Duration duration = const Duration(hours: 1)}) async {
     final expiry = DateTime.now().add(duration);
-    if (_userId != null) await _firebaseSync.recordBoostExpiry(_userId!, expiry);
     _boostExpiry = expiry;
-    await _persist();
+    await _persist(forceRemote: false);
     notifyListeners();
   }
 
@@ -829,11 +898,7 @@ class GameStateService extends ChangeNotifier {
     List<String> newRigs = List.from(_data.ownedRigIds);
     if (rigId != null) newRigs.add(rigId);
     _data = _data.copyWith(ownedRigIds: newRigs);
-    if (boostDuration != null && _userId != null) {
-      final expiry = DateTime.now().add(boostDuration);
-      await _firebaseSync.recordBoostExpiry(_userId!, expiry);
-      _boostExpiry = expiry;
-    } else if (boostDuration != null) {
+    if (boostDuration != null) {
       _boostExpiry = DateTime.now().add(boostDuration);
     }
     await _persist();

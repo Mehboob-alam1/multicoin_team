@@ -1,52 +1,42 @@
-import 'package:firebase_database/firebase_database.dart';
 import '../models/player_data.dart';
+import 'supabase_bootstrap.dart';
 
-/// Firebase usage is kept low to control costs:
-/// - Sync to cloud every 10 min (home_shell), min interval 12 min (game_state).
-/// - Game state fetches from Firebase only once per app session.
-/// - Leaderboard: RTDB only, 100 entries, 5 min cache (LeaderboardService.fetchTop).
-/// - Events: Firestore refresh at most every 6 h (EventService).
-/// - Referral: Firestore cache 24 h (ReferralService).
-/// - Remote Config: fetch at most every 6 h in release.
+/// Cloud backup via **Supabase**. Firebase Auth uid is the row key.
+/// Local SharedPreferences remains the source of truth.
 class FirebaseSyncService {
-  final _db = FirebaseDatabase.instance;
-  static const _users = 'users';
-  static const _leaderboard = 'leaderboard';
-  static const _playerData = 'playerData';
-  static const _purchases = 'purchases';
-  static const _oneTime = 'oneTime';
-  static const _subscription = 'subscription';
-  static const _boostExpiryMs = 'boostExpiryMs';
-  static const _googleHistory = 'googleHistory';
-  static const _farmRigs = 'farmRigs';
-  static const _iapCatalog = 'iapCatalog';
-
-  /// Sync full player data to Firebase (merge with cloud).
-  Future<void> syncPlayerData(String uid, PlayerData data, {String? displayName}) async {
-    try {
-      final ref = _db.ref('$_users/$uid/$_playerData');
-      await ref.set(data.toJson());
-      if (displayName != null && displayName.isNotEmpty) {
-        await _db.ref('$_users/$uid/profile/displayName').set(displayName);
-      }
-    } catch (_) {
-      rethrow;
-    }
+  Map<String, dynamic>? _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
   }
 
-  /// Fetch player data from Firebase. Returns null if none or error.
-  Future<PlayerData?> fetchPlayerData(String uid) async {
+  Future<void> syncPlayerData(String uid, PlayerData data, {String? displayName}) async {
+    final client = SupabaseBootstrap.client;
+    if (client == null) return;
     try {
-      final snap = await _db.ref('$_users/$uid/$_playerData').get();
-      if (!snap.exists || snap.value == null) return null;
-      final map = Map<String, dynamic>.from(snap.value as Map);
+      await client.from('players').upsert({
+        'uid': uid,
+        if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
+        'player_data': data.toJson(),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (_) {}
+  }
+
+  Future<PlayerData?> fetchPlayerData(String uid) async {
+    final client = SupabaseBootstrap.client;
+    if (client == null) return null;
+    try {
+      final row = await client.from('players').select('player_data').eq('uid', uid).maybeSingle();
+      if (row == null) return null;
+      final map = _asMap(row['player_data']);
+      if (map == null) return null;
       return PlayerData.fromJson(map);
     } catch (_) {
       return null;
     }
   }
 
-  /// Update leaderboard entry for this user (call after balance/mining power change).
   Future<void> updateLeaderboard(
     String uid, {
     required String displayName,
@@ -56,62 +46,67 @@ class FirebaseSyncService {
     String region = 'all',
     String flag = '',
   }) async {
+    final client = SupabaseBootstrap.client;
+    if (client == null) return;
     try {
-      await _db.ref('$_leaderboard/entries/$uid').set({
-        'displayName': displayName,
-        'btcBalance': btcBalance,
-        'totalBtcPerMin': totalBtcPerMin,
-        'farmSize': farmSize,
+      await client.from('leaderboard').upsert({
+        'uid': uid,
+        'display_name': displayName,
+        'btc_balance': btcBalance,
+        'total_btc_per_min': totalBtcPerMin,
+        'farm_size': farmSize,
         'region': region,
         'flag': flag,
-        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
-    } catch (_) {
-      rethrow;
-    }
+    } catch (_) {}
   }
 
-  /// Get top entries by balance (descending). Returns list of [rank, displayName, btcBalance, totalBtcPerMin].
   Future<List<LeaderboardEntry>> getLeaderboard({int limit = 100}) async {
+    final client = SupabaseBootstrap.client;
+    if (client == null) return [];
     try {
-      final snap = await _db.ref('$_leaderboard/entries').orderByChild('btcBalance').limitToLast(100).get();
-      if (!snap.exists || snap.value == null) return [];
-      final map = snap.value as Map<dynamic, dynamic>;
-      final list = map.entries
+      final rows = await client
+          .from('leaderboard')
+          .select()
+          .order('btc_balance', ascending: false)
+          .limit(limit);
+      return (rows as List)
           .map((e) {
-            final v = Map<dynamic, dynamic>.from(e.value as Map);
+            final v = _asMap(e) ?? {};
             return LeaderboardEntry(
-              uid: e.key as String,
-              displayName: v['displayName'] as String? ?? 'Unknown',
-              btcBalance: (v['btcBalance'] as num?)?.toDouble() ?? 0,
-              totalBtcPerMin: (v['totalBtcPerMin'] as num?)?.toDouble() ?? 0,
-              farmSize: (v['farmSize'] as num?)?.toInt() ?? 0,
+              uid: v['uid'] as String? ?? '',
+              displayName: v['display_name'] as String? ?? 'Unknown',
+              btcBalance: (v['btc_balance'] as num?)?.toDouble() ?? 0,
+              totalBtcPerMin: (v['total_btc_per_min'] as num?)?.toDouble() ?? 0,
+              farmSize: (v['farm_size'] as num?)?.toInt() ?? 0,
               region: v['region'] as String? ?? 'all',
               flag: v['flag'] as String? ?? '',
             );
           })
+          .where((e) => e.uid.isNotEmpty)
           .toList();
-      list.sort((a, b) => b.btcBalance.compareTo(a.btcBalance));
-      return list.take(limit).toList();
     } catch (_) {
       return [];
     }
   }
 
-  /// Record one-time purchase entitlement (store in Firebase).
   Future<void> recordOneTimePurchase(String uid, String productId) async {
+    final client = SupabaseBootstrap.client;
+    if (client == null) return;
     try {
-      await _db.ref('$_users/$uid/$_purchases/$_oneTime/$productId').set({
-        'at': DateTime.now().millisecondsSinceEpoch,
-        'googleProductId': productId,
+      await client.from('purchases').insert({
+        'uid': uid,
+        'product_id': productId,
+        'category': 'one_time',
         'source': 'google_play',
+        'is_subscription': false,
+        'is_consumable': false,
       });
-    } catch (_) {
-      rethrow;
-    }
+      await _appendOneTime(uid, productId);
+    } catch (_) {}
   }
 
-  /// Full Google Play purchase record: entitlement + history (and farm line if a rig).
   Future<void> recordGooglePlayPurchase({
     required String uid,
     required String productId,
@@ -124,121 +119,134 @@ class FirebaseSyncService {
     String? rigId,
     String source = 'google_play',
   }) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final payload = <String, dynamic>{
-      'productId': productId,
-      'googleProductId': productId,
+    final client = SupabaseBootstrap.client;
+    if (client == null) return;
+    try {
+    await client.from('purchases').insert({
+      'uid': uid,
+      'product_id': productId,
       'category': category,
       'source': source,
-      'at': now,
-      if (purchaseId != null && purchaseId.isNotEmpty) 'orderId': purchaseId,
-      if (purchaseToken != null && purchaseToken.isNotEmpty) 'purchaseToken': purchaseToken,
-      if (rigId != null) 'rigId': rigId,
-    };
-
-    try {
-      await _db.ref('$_users/$uid/$_purchases/$_googleHistory').push().set(payload);
-
-      if (isSubscription && subscriptionExpiry != null) {
-        await _db.ref('$_users/$uid/$_purchases/$_subscription').set({
-          'planId': productId,
-          'googleProductId': productId,
-          'expiryMs': subscriptionExpiry.millisecondsSinceEpoch,
-          'source': source,
-          if (purchaseId != null) 'orderId': purchaseId,
-          if (purchaseToken != null) 'purchaseToken': purchaseToken,
-        });
-        return;
-      }
-
-      if (isConsumable && category == 'farm_rig') {
-        await _db.ref('$_users/$uid/$_purchases/$_farmRigs').push().set(payload);
-      }
-
-      if (!isConsumable || category == 'one_time') {
-        await _db.ref('$_users/$uid/$_purchases/$_oneTime/$productId').set({
-          'at': now,
-          'googleProductId': productId,
-          'source': source,
-          if (purchaseId != null) 'lastOrderId': purchaseId,
-        });
-      }
-    } catch (_) {
-      rethrow;
-    }
-  }
-
-  /// Record subscription (planId + expiry timestamp ms).
-  Future<void> recordSubscription(String uid, String planId, DateTime expiry) async {
-    try {
-      await _db.ref('$_users/$uid/$_purchases/$_subscription').set({
-        'planId': planId,
-        'googleProductId': planId,
-        'expiryMs': expiry.millisecondsSinceEpoch,
-        'source': 'google_play',
+      'is_subscription': isSubscription,
+      'is_consumable': isConsumable,
+      if (purchaseId != null && purchaseId.isNotEmpty) 'order_id': purchaseId,
+      if (purchaseToken != null && purchaseToken.isNotEmpty) 'purchase_token': purchaseToken,
+      if (rigId != null) 'rig_id': rigId,
+      if (subscriptionExpiry != null) 'expiry_ms': subscriptionExpiry.millisecondsSinceEpoch,
+    });
+    if (isSubscription && subscriptionExpiry != null) {
+      await client.from('players').upsert({
+        'uid': uid,
+        'premium_expiry_ms': subscriptionExpiry.millisecondsSinceEpoch,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
-    } catch (_) {
-      rethrow;
+      return;
     }
+    if (!isConsumable || category == 'one_time') {
+      await _appendOneTime(uid, productId);
+    }
+    } catch (_) {}
   }
 
-  /// Check if user has purchased one-time product.
+  Future<void> recordSubscription(String uid, String planId, DateTime expiry) async {
+    final client = SupabaseBootstrap.client;
+    if (client == null) return;
+    try {
+    await client.from('players').upsert({
+      'uid': uid,
+      'premium_expiry_ms': expiry.millisecondsSinceEpoch,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    });
+    await client.from('purchases').insert({
+      'uid': uid,
+      'product_id': planId,
+      'category': 'premium',
+      'source': 'google_play',
+      'is_subscription': true,
+      'is_consumable': false,
+      'expiry_ms': expiry.millisecondsSinceEpoch,
+    });
+    } catch (_) {}
+  }
+
   Future<bool> hasOneTimePurchase(String uid, String productId) async {
-    try {
-      final snap = await _db.ref('$_users/$uid/$_purchases/$_oneTime/$productId').get();
-      return snap.exists;
-    } catch (_) {
-      return false;
-    }
+    final ids = await getOneTimePurchases(uid);
+    return ids.contains(productId);
   }
 
-  /// Get all one-time purchase IDs.
   Future<List<String>> getOneTimePurchases(String uid) async {
+    final client = SupabaseBootstrap.client;
+    if (client == null) return [];
     try {
-      final snap = await _db.ref('$_users/$uid/$_purchases/$_oneTime').get();
-      if (!snap.exists || snap.value == null) return [];
-      final map = snap.value as Map<dynamic, dynamic>;
-      return map.keys.map((e) => e as String).toList();
+      final row = await client
+          .from('players')
+          .select('one_time_products')
+          .eq('uid', uid)
+          .maybeSingle();
+      final raw = row?['one_time_products'];
+      if (raw is List) return raw.map((e) => e.toString()).toList();
+      final purchases = await client
+          .from('purchases')
+          .select('product_id')
+          .eq('uid', uid)
+          .eq('is_consumable', false)
+          .eq('is_subscription', false);
+      return (purchases as List)
+          .map((e) => (e as Map)['product_id']?.toString() ?? '')
+          .where((e) => e.isNotEmpty)
+          .toSet()
+          .toList();
     } catch (_) {
       return [];
     }
   }
 
-  /// Record 2x boost expiry (e.g. 1 hour from now).
   Future<void> recordBoostExpiry(String uid, DateTime expiry) async {
+    final client = SupabaseBootstrap.client;
+    if (client == null) return;
     try {
-      await _db.ref('$_users/$uid/$_purchases/$_boostExpiryMs').set(expiry.millisecondsSinceEpoch);
-    } catch (_) {
-      rethrow;
-    }
+      await client.from('players').upsert({
+        'uid': uid,
+        'boost_expiry_ms': expiry.millisecondsSinceEpoch,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (_) {}
   }
 
-  /// Get boost expiry (null if none or expired).
   Future<DateTime?> getBoostExpiry(String uid) async {
-    try {
-      final snap = await _db.ref('$_users/$uid/$_purchases/$_boostExpiryMs').get();
-      if (!snap.exists || snap.value == null) return null;
-      final ms = (snap.value as num).toInt();
-      final expiry = DateTime.fromMillisecondsSinceEpoch(ms);
-      return expiry.isAfter(DateTime.now()) ? expiry : null;
-    } catch (_) {
-      return null;
-    }
+    return _msToFutureDate(uid, 'boost_expiry_ms');
   }
 
-  /// Get subscription expiry (null if none or expired).
   Future<DateTime?> getSubscriptionExpiry(String uid) async {
+    return _msToFutureDate(uid, 'premium_expiry_ms');
+  }
+
+  Future<DateTime?> _msToFutureDate(String uid, String column) async {
+    final client = SupabaseBootstrap.client;
+    if (client == null) return null;
     try {
-      final snap = await _db.ref('$_users/$uid/$_purchases/$_subscription').get();
-      if (!snap.exists || snap.value == null) return null;
-      final map = snap.value as Map<dynamic, dynamic>;
-      final ms = (map['expiryMs'] as num?)?.toInt();
+      final row = await client.from('players').select(column).eq('uid', uid).maybeSingle();
+      final ms = (row?[column] as num?)?.toInt();
       if (ms == null) return null;
       final expiry = DateTime.fromMillisecondsSinceEpoch(ms);
       return expiry.isAfter(DateTime.now()) ? expiry : null;
     } catch (_) {
       return null;
     }
+  }
+
+  Future<void> _appendOneTime(String uid, String productId) async {
+    final client = SupabaseBootstrap.client;
+    if (client == null) return;
+    try {
+      final existing = await getOneTimePurchases(uid);
+      if (existing.contains(productId)) return;
+      await client.from('players').upsert({
+        'uid': uid,
+        'one_time_products': [...existing, productId],
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (_) {}
   }
 }
 

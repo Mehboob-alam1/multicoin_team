@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'app.dart';
+import 'services/supabase_bootstrap.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -50,5 +51,8 @@ void main() async {
     );
     return;
   }
+  try {
+    await SupabaseBootstrap.init();
+  } catch (_) {}
   runApp(const BtcSimApp());
 }

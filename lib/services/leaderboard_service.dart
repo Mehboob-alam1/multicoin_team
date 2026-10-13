@@ -49,7 +49,7 @@ class LeaderboardService extends ChangeNotifier {
   final FirebaseSyncService _firebaseSync;
   static const _cacheKey = 'leaderboard_cache';
   static const _cacheTimeKey = 'leaderboard_cache_time_ms';
-  static const _cacheMaxAge = Duration(minutes: 5);
+  static const _cacheMaxAge = Duration(hours: 24);
 
   List<GlobalLeaderboardEntry> _cached = [];
   List<GlobalLeaderboardEntry> get cached => List.unmodifiable(_cached);
